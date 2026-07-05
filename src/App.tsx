@@ -151,7 +151,14 @@ function ModalView({ modal, onClose }: { modal: Modal; onClose: () => void }) {
     case 'fillGap':
       return <FillGapSheet date={modal.date} onClose={onClose} />;
     case 'foodForm':
-      return <FoodFormSheet foodId={modal.foodId} onSaved={modal.onSaved} onClose={onClose} />;
+      return (
+        <FoodFormSheet
+          foodId={modal.foodId}
+          initialName={modal.initialName}
+          onSaved={modal.onSaved}
+          onClose={onClose}
+        />
+      );
     case 'scanLabel':
       return <ScanLabelSheet onSaved={modal.onSaved} onClose={onClose} />;
     case 'scanList':

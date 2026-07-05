@@ -1,10 +1,10 @@
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Sheet from '../../components/Sheet';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { db } from '../../db/db';
 import { addFood } from '../../db/repo';
-import { AiError, extractMealFromUrl } from '../../lib/ai';
+import { AiError, extractMealFromUrl, extractNutritionLabel } from '../../lib/ai';
 import { fmtG, parseGrams } from '../../lib/fiber';
 import { useNav } from '../../nav';
 import { DEFAULT_SETTINGS, type Food } from '../../types';
@@ -60,6 +60,9 @@ export default function ImportLinkSheet({
   const [sourceUrl, setSourceUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  // Scan-the-card-to-fill-the-link: reads the printed URL off a card photo.
+  const [cardReading, setCardReading] = useState(false);
+  const [cardNote, setCardNote] = useState<string | null>(null);
   // One controller per import attempt, so Cancel can abort the in-flight call.
   const abortRef = useRef<AbortController | null>(null);
   // Distinguishes a hard-deadline abort from the user tapping Cancel.
@@ -158,6 +161,37 @@ export default function ImportLinkSheet({
     openModal({ type: 'scanLabel', onSaved });
   }
 
+  /** Read the printed nutrition URL off a photographed recipe card and drop it
+   * into the link field, so she can just tap Import. */
+  async function readCardForUrl(e: ChangeEvent<HTMLInputElement>) {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || !apiKey || cardReading) return;
+    setCardReading(true);
+    setCardNote(null);
+    try {
+      const ex = await extractNutritionLabel(file, apiKey);
+      const found = ex.nutritionUrl?.trim();
+      if (found) {
+        setUrl(found);
+        setCardNote('Found the link on the card — tap Import.');
+      } else if (ex.fiberGramsPerServing > 0) {
+        setCardNote(
+          'That looks like a full nutrition panel, not a card with a link — use “Scan a label” to read it directly.',
+        );
+      } else {
+        setCardNote('No nutrition link found on that photo. Paste the link, or use “Scan a label”.');
+      }
+    } catch (err) {
+      setCardNote(
+        err instanceof AiError ? err.message : 'Couldn’t read that photo — try again, or paste the link.',
+      );
+    } finally {
+      setCardReading(false);
+    }
+  }
+
   async function save() {
     if (!valid || busy) return;
     setBusy(true);
@@ -254,8 +288,37 @@ export default function ImportLinkSheet({
           >
             Import
           </button>
+
+          <div className="il-or">
+            <span>or</span>
+          </div>
+
+          <label className={cardReading ? 'btn btn-ghost btn-block il-scan on' : 'btn btn-ghost btn-block il-scan'}>
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              hidden
+              disabled={cardReading}
+              onChange={readCardForUrl}
+            />
+            {cardReading ? 'Reading the card…' : '📷 Scan the recipe card to fill the link'}
+          </label>
+          <label className="il-scan-roll small">
+            <input
+              type="file"
+              accept="image/*"
+              hidden
+              disabled={cardReading}
+              onChange={readCardForUrl}
+            />
+            or choose a screenshot of the card
+          </label>
+          {cardNote && <p className="small il-card-note">{cardNote}</p>}
+
           <p className="small muted il-caption">
-            Works with Home Chef recipe pages — and most recipe sites with printed nutrition.
+            Works with Home Chef recipe pages — the card in the box prints the link, so a photo of
+            it fills the field for you.
           </p>
         </>
       ) : step === 'fetching' ? (

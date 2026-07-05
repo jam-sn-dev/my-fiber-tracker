@@ -135,6 +135,15 @@
   background: var(--leaf-wash);
 }
 
+.lb-lookup-cta {
+  display: inline-block;
+  margin: 14px auto 0;
+}
+.lb-lookup-or {
+  display: block;
+  margin-top: 10px;
+}
+
 /* ---------- floating add button ---------- */
 .lb-fab {
   position: fixed;

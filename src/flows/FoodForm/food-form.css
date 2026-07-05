@@ -4,6 +4,77 @@
   min-height: 240px;
 }
 
+/* auto / manual mode toggle */
+.lb-ff-modes {
+  display: flex;
+  gap: 4px;
+  background: var(--paper-2);
+  border-radius: var(--r-sm);
+  padding: 3px;
+  margin-bottom: 12px;
+}
+.lb-ff-modes button {
+  flex: 1;
+  min-height: 40px;
+  border-radius: 7px;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--muted);
+}
+.lb-ff-modes button.on {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.lb-ff-mode-note {
+  margin: -4px 2px 14px;
+  line-height: 1.45;
+}
+
+/* auto-lookup control block */
+.lb-ff-lookup {
+  margin-bottom: 14px;
+}
+.lb-ff-switch {
+  display: block;
+  width: 100%;
+  text-align: center;
+  color: var(--leaf-deep);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 0 2px;
+}
+.lb-ff-looking {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.lb-ff-spin {
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--line);
+  border-top-color: var(--leaf);
+  border-radius: 50%;
+  animation: lb-ff-spin 0.8s linear infinite;
+}
+@keyframes lb-ff-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lb-ff-spin { animation: none; }
+}
+.lb-ff-info {
+  background: var(--leaf-wash);
+  color: var(--leaf-deep);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+
 .lb-ff-note {
   background: #f6edd8;
   color: #7c5f1d;

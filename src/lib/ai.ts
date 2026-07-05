@@ -25,7 +25,15 @@ export class AiError extends Error {
   }
 }
 
-const MODEL = 'claude-opus-4-8';
+/**
+ * One model for every AI call in Fibi. Sonnet 5 is Anthropic's balanced tier:
+ * near-Opus quality at a fraction of the cost, and it supports everything this
+ * app needs — image reading (labels/cards), the web-fetch tool (Home Chef
+ * pages), structured JSON output, and solid nutrition knowledge (fiber lookup).
+ * Opus would be overkill for reading a number off a label; Haiku would be
+ * cutting corners on health data. Sonnet is the right middle.
+ */
+const MODEL = 'claude-sonnet-5';
 
 const LABEL_SCHEMA = {
   type: 'object',

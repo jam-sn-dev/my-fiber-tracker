@@ -71,11 +71,16 @@ export default function LibraryScreen() {
             ))}
           </div>
         ) : searching ? (
-          <p className="empty-note">
+          <div className="empty-note">
             Nothing matches “{search.trim()}” yet.
-            <br />
-            Tap + to add it — scan a label or type it in.
-          </p>
+            <button
+              className="btn btn-primary lb-lookup-cta"
+              onClick={() => openModal({ type: 'foodForm', initialName: search.trim() })}
+            >
+              🔎 Look up “{search.trim()}” fiber
+            </button>
+            <span className="small muted lb-lookup-or">or tap + to scan a label</span>
+          </div>
         ) : (
           <p className="empty-note">
             No foods here yet.

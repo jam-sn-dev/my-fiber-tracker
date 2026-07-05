@@ -10,7 +10,7 @@ export type Tab = 'today' | 'library' | 'history';
 export type Modal =
   | { type: 'addEntry'; date: string; slot: Slot }
   | { type: 'fillGap'; date: string }
-  | { type: 'foodForm'; foodId?: number; onSaved?: (food: Food) => void }
+  | { type: 'foodForm'; foodId?: number; initialName?: string; onSaved?: (food: Food) => void }
   | { type: 'scanLabel'; onSaved?: (food: Food) => void }
   | { type: 'scanList' }
   | { type: 'importLink'; onSaved?: (food: Food) => void }
