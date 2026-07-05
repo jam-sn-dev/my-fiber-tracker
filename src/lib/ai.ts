@@ -646,3 +646,100 @@ Her sentence: "${transcript.replace(/"/g, "'")}"`;
   }
   return parsed;
 }
+
+// ---------------------------------------------------------------------------
+// Lane: look up dietary fiber for a food by name (Claude's nutrition knowledge)
+// ---------------------------------------------------------------------------
+
+export interface FoodFiberLookup {
+  /** True when Claude can give a well-established generic value. */
+  known: boolean;
+  /** Cleaned common name, e.g. "Bell pepper, raw". */
+  name: string;
+  /** A common household serving, e.g. "1 medium" or "1 cup, chopped". */
+  servingLabel: string;
+  /** Dietary fiber grams for that serving. Meaningful only when known. */
+  fiberGramsPerServing: number;
+  confidence: 'high' | 'medium' | 'low';
+  /** Short caveat, or why it's unknown (e.g. "brand varies — scan the label"). */
+  note: string | null;
+}
+
+const FOOD_LOOKUP_SCHEMA = {
+  type: 'object',
+  properties: {
+    known: {
+      type: 'boolean',
+      description:
+        'true only for a common generic whole/prepared food with a well-established dietary-fiber value; false for branded/packaged products or anything you cannot give a reliable number for',
+    },
+    name: { type: 'string', description: 'Cleaned common food name' },
+    servingLabel: {
+      type: 'string',
+      description: 'A common household serving, e.g. "1 medium", "1 cup, chopped", "1/2 cup cooked"',
+    },
+    fiberGramsPerServing: {
+      type: 'number',
+      description: 'Dietary fiber grams for that serving (USDA-consistent). 0 if truly unknown.',
+    },
+    confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+    note: {
+      type: ['string', 'null'],
+      description:
+        'Short caveat if useful (e.g. "varies by size"), or why unknown (e.g. "branded item — scan the label for its exact value"). Else null.',
+    },
+  },
+  required: ['known', 'name', 'servingLabel', 'fiberGramsPerServing', 'confidence', 'note'],
+  additionalProperties: false,
+} as const;
+
+/**
+ * Look up the dietary fiber of a food by name using Claude's nutrition
+ * knowledge — so common generics ("bell pepper", "cooked quinoa") don't need
+ * manual entry. The caller shows an editable confirm step before saving, and
+ * anything saved this way is marked as an estimate.
+ */
+export async function lookupFoodFiber(
+  query: string,
+  apiKey: string,
+  signal?: AbortSignal,
+): Promise<FoodFiberLookup> {
+  const term = query.trim();
+  if (!term) throw new AiError('other', 'Type a food name to look up.');
+
+  const prompt = `Give the dietary fiber content of this food: "${term.replace(/"/g, "'")}".
+
+Rules:
+- Use well-established USDA-consistent values for common generic foods (fruits, vegetables, legumes, grains, nuts, common prepared dishes). Pick a natural household serving (e.g. "1 medium", "1 cup, chopped", "1/2 cup cooked") and give the DIETARY FIBER grams for that serving.
+- Set known=true only when you are confident in a real, established value. For a specific BRANDED or packaged product (a named cereal, bar, bread brand, restaurant item), set known=false, fiberGramsPerServing=0, and note that its label should be scanned for the exact value — do NOT guess a branded product's number.
+- If the term is vague, pick the most common interpretation and say so in note.
+- Never fabricate a precise number for something you don't actually know. Prefer known=false over a made-up value.`;
+
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+  let response: Anthropic.Message;
+  try {
+    response = await client.messages.create(
+      {
+        model: MODEL,
+        max_tokens: 700,
+        output_config: { format: { type: 'json_schema', schema: FOOD_LOOKUP_SCHEMA } },
+        messages: [{ role: 'user', content: prompt }],
+      },
+      { signal, timeout: 45_000 },
+    );
+  } catch (err) {
+    throw mapApiError(err, 'Fiber lookup');
+  }
+
+  if (response.stop_reason === 'refusal') {
+    throw new AiError('refused', 'That one couldn’t be looked up — add it manually instead.');
+  }
+
+  const parsed = parseJsonLoose<FoodFiberLookup>(finalText(response));
+  if (typeof parsed.known !== 'boolean' || typeof parsed.fiberGramsPerServing !== 'number') {
+    throw new AiError('other', 'The lookup couldn’t be read. Try again, or add it manually.');
+  }
+  if (!parsed.servingLabel?.trim()) parsed.servingLabel = '1 serving';
+  if (!parsed.name?.trim()) parsed.name = term;
+  return parsed;
+}

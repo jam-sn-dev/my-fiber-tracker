@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Sheet from '../../components/Sheet';
 import { db } from '../../db/db';
 import { addEntry, addFood, makeFoodEntry, makeMealEntry } from '../../db/repo';
 import { USDA_FOODS } from '../../db/usda-foods';
+import { AiError, lookupFoodFiber } from '../../lib/ai';
 import { fmtG, parseGrams } from '../../lib/fiber';
 import { useNav } from '../../nav';
-import { SLOT_LABELS, type Food, type Slot } from '../../types';
+import { DEFAULT_SETTINGS, SLOT_LABELS, type Food, type Slot } from '../../types';
 import './addentry.css';
 
 type Seg = 'foods' | 'meals';
@@ -55,8 +56,20 @@ export default function AddEntrySheet({
   const [quickFiber, setQuickFiber] = useState('');
   const [busy, setBusy] = useState(false);
 
+  // AI fiber lookup (for foods not in the library or bundled database)
+  const [lookStep, setLookStep] = useState<'idle' | 'looking' | 'result' | 'error'>('idle');
+  const [lookError, setLookError] = useState<AiError | null>(null);
+  const [lookName, setLookName] = useState('');
+  const [lookServing, setLookServing] = useState('');
+  const [lookFiber, setLookFiber] = useState('');
+  const [lookNote, setLookNote] = useState<string | null>(null);
+  const [lookEstimate, setLookEstimate] = useState(true); // true = save as 'estimate'
+  const lookAbort = useRef<AbortController | null>(null);
+
   const allFoods = useLiveQuery(() => db.foods.toArray(), []);
   const allMeals = useLiveQuery(() => db.meals.toArray(), []);
+  const settings = useLiveQuery(async () => (await db.settings.get('app')) ?? DEFAULT_SETTINGS, []);
+  const apiKey = settings?.apiKey?.trim() ?? '';
 
   const q = query.trim().toLowerCase();
   const rows: RowData[] | undefined =
@@ -164,6 +177,81 @@ export default function AddEntrySheet({
         onClose();
       },
     });
+  }
+
+  async function runLookup() {
+    const term = query.trim();
+    if (!term || lookStep === 'looking') return;
+    if (!apiKey) {
+      setLookStep('error');
+      setLookError(
+        new AiError('auth', 'Looking up foods uses AI — add a one-time API key in Settings first.'),
+      );
+      return;
+    }
+    setLookError(null);
+    setLookStep('looking');
+    const ctrl = new AbortController();
+    lookAbort.current = ctrl;
+    try {
+      const r = await lookupFoodFiber(term, apiKey, ctrl.signal);
+      if (ctrl.signal.aborted) return;
+      setLookName(r.name);
+      setLookServing(r.servingLabel);
+      // A branded/unknown item comes back known=false with 0 g — leave the
+      // fiber blank so she fills it or scans, rather than saving a fake 0.
+      setLookFiber(r.known ? fmtG(r.fiberGramsPerServing) : '');
+      setLookEstimate(true);
+      setLookNote(
+        r.known
+          ? r.note
+          : (r.note ??
+              'This looks like a branded item — scan its label for the exact value, or type it in.'),
+      );
+      setLookStep('result');
+    } catch (err) {
+      if (ctrl.signal.aborted) return;
+      setLookError(
+        err instanceof AiError ? err : new AiError('other', 'Lookup failed. Try again.'),
+      );
+      setLookStep('error');
+    }
+  }
+
+  function cancelLookup() {
+    lookAbort.current?.abort();
+    setLookStep('idle');
+    setLookError(null);
+  }
+
+  const lookFiberNum = parseGrams(lookFiber);
+  const lookValid =
+    lookName.trim().length > 0 &&
+    lookServing.trim().length > 0 &&
+    lookFiber.trim().length > 0 &&
+    Number.isFinite(lookFiberNum) &&
+    lookFiberNum >= 0;
+
+  async function saveLookup() {
+    if (!lookValid || busy) return;
+    setBusy(true);
+    try {
+      const fields = {
+        name: lookName.trim(),
+        servingLabel: lookServing.trim(),
+        fiberPerServing: Math.round(lookFiberNum * 10) / 10,
+        // If she edited the fiber to her own value it's hers ('manual');
+        // an AI value she accepted stays flagged as an estimate.
+        source: lookEstimate ? ('estimate' as const) : ('manual' as const),
+        favorite: false,
+      };
+      const id = await addFood(fields);
+      const food: Food = { ...fields, id, timesUsed: 0 };
+      await addEntry(date, makeFoodEntry(food, 1, slot));
+      onClose();
+    } finally {
+      setBusy(false);
+    }
   }
 
   const quickFiberNum = parseGrams(quickFiber);
@@ -279,14 +367,29 @@ export default function AddEntrySheet({
         </div>
       )}
 
+      {seg === 'foods' && lookStep !== 'idle' && renderLookupPanel()}
+
       {rows && rows.length === 0 && usdaRows.length === 0 && (
         <div className="empty-note">
           {q ? (
-            <>
-              No matches for “{query.trim()}”.
-              <br />
-              “New food” or “Scan a label” above will add it in seconds.
-            </>
+            seg === 'foods' ? (
+              <>
+                No matches for “{query.trim()}” in your library or the food database.
+                {lookStep === 'idle' && (
+                  <>
+                    <br />
+                    <button className="btn btn-primary pk-ae-lookup-cta" onClick={() => void runLookup()}>
+                      🔎 Look up “{query.trim()}” fiber
+                    </button>
+                    <span className="pk-ae-lookup-or small muted">
+                      or use “New food” / “Scan a label” above
+                    </span>
+                  </>
+                )}
+              </>
+            ) : (
+              <>No meals yet — build one in the Library tab, or add foods one at a time.</>
+            )
           ) : seg === 'meals' ? (
             <>No meals yet — build one in the Library tab, or add foods one at a time.</>
           ) : (
@@ -305,8 +408,112 @@ export default function AddEntrySheet({
           <div className="card row-list pk-ae-list">{usdaRows.map(renderRow)}</div>
         </>
       )}
+
+      {/* When there ARE matches but not the exact food she means, still let
+          her look it up. */}
+      {seg === 'foods' &&
+        q &&
+        lookStep === 'idle' &&
+        ((rows && rows.length > 0) || usdaRows.length > 0) && (
+          <button className="btn-quiet pk-ae-lookup-more" onClick={() => void runLookup()}>
+            🔎 Not here? Look up “{query.trim()}” fiber
+          </button>
+        )}
     </Sheet>
   );
+
+  function renderLookupPanel() {
+    if (lookStep === 'looking') {
+      return (
+        <div className="card pk-ae-lookup" role="status">
+          <div className="pk-ae-lookup-spin" aria-hidden="true" />
+          <p className="pk-ae-lookup-lead">Looking up “{query.trim()}”…</p>
+          <button className="btn btn-ghost btn-block" onClick={cancelLookup}>
+            Cancel
+          </button>
+        </div>
+      );
+    }
+    if (lookStep === 'error' && lookError) {
+      return (
+        <div className="card pk-ae-lookup">
+          <p className="pk-ae-lookup-lead">{lookError.message}</p>
+          <div className="pk-ae-lookup-btns">
+            {lookError.kind === 'auth' ? (
+              <button
+                className="btn btn-primary btn-block"
+                onClick={() => openModal({ type: 'settings' })}
+              >
+                Open Settings
+              </button>
+            ) : (
+              <button className="btn btn-primary btn-block" onClick={() => void runLookup()}>
+                Try again
+              </button>
+            )}
+            <button className="btn btn-ghost btn-block" onClick={cancelLookup}>
+              Close
+            </button>
+          </div>
+        </div>
+      );
+    }
+    if (lookStep === 'result') {
+      return (
+        <div className="card pk-ae-lookup">
+          <p className="pk-ae-lookup-title">Add this food?</p>
+          <div className="pk-ae-lookup-info small">Fiber from AI — check it before saving.</div>
+          {lookNote && <div className="pk-ae-lookup-note small">{lookNote}</div>}
+          <div className="field">
+            <label htmlFor="pk-ae-look-name">Name</label>
+            <input
+              id="pk-ae-look-name"
+              value={lookName}
+              onChange={(e) => setLookName(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="pk-ae-look-serving">Serving</label>
+            <input
+              id="pk-ae-look-serving"
+              value={lookServing}
+              onChange={(e) => setLookServing(e.target.value)}
+              placeholder="1 serving"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="pk-ae-look-fiber">Fiber per serving (grams)</label>
+            <input
+              id="pk-ae-look-fiber"
+              inputMode="decimal"
+              value={lookFiber}
+              onChange={(e) => {
+                setLookFiber(e.target.value);
+                setLookEstimate(false); // her own value → saved as 'manual'
+              }}
+              placeholder="e.g. 2.5"
+            />
+          </div>
+          <div className="pk-ae-lookup-btns">
+            <button
+              className="btn btn-primary btn-block"
+              disabled={!lookValid || busy}
+              onClick={() => void saveLookup()}
+            >
+              Save &amp; add to {SLOT_LABELS[slot]}
+            </button>
+            <button className="btn btn-ghost btn-block" onClick={() => scanLabel()}>
+              Scan the label instead
+            </button>
+            <button className="btn-quiet pk-ae-lookup-cancel" onClick={cancelLookup}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  }
 
   function renderRow(row: RowData) {
     const open = expanded === row.key;

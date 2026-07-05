@@ -1,5 +1,75 @@
 /* AddEntry picker — every class prefixed pk-ae- */
 
+/* --- AI fiber lookup --- */
+.pk-ae-lookup-cta {
+  display: inline-block;
+  margin: 14px auto 0;
+}
+.pk-ae-lookup-or {
+  display: block;
+  margin-top: 10px;
+}
+.pk-ae-lookup-more {
+  display: block;
+  width: 100%;
+  margin: 12px 0 4px;
+  text-align: center;
+}
+.pk-ae-lookup {
+  margin: 12px 0;
+  padding: 16px;
+}
+.pk-ae-lookup-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.pk-ae-lookup-lead {
+  font-size: 15px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+.pk-ae-lookup-info {
+  background: var(--leaf-wash);
+  color: var(--leaf-deep);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+.pk-ae-lookup-note {
+  background: #fdf4e3;
+  color: #7a5a1e;
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+.pk-ae-lookup-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.pk-ae-lookup-cancel {
+  align-self: center;
+  margin-top: 2px;
+}
+.pk-ae-lookup-spin {
+  width: 30px;
+  height: 30px;
+  margin: 6px auto 12px;
+  border: 3px solid var(--line);
+  border-top-color: var(--leaf);
+  border-radius: 50%;
+  animation: pk-ae-spin 0.8s linear infinite;
+}
+@keyframes pk-ae-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pk-ae-lookup-spin { animation: none; }
+}
+
 .pk-ae-search {
   margin: 2px 0 10px;
 }
