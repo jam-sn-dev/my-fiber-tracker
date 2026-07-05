@@ -192,13 +192,26 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
   function softFail(message: string) {
     failsRef.current += 1;
     if (failsRef.current >= 2) {
-      persistVoiceMode('typed');
+      // Session-only fallback: transient hiccups (silence, a network blip)
+      // must never permanently hide the mic — and the typed view offers a
+      // "use the microphone" way back regardless.
       setMode('typed');
-      setNote('The mic is being shy on this device — the keyboard mic below works just as well.');
+      setNote('The mic is being shy right now — the keyboard mic below works just as well.');
     } else {
       setNote(message);
     }
     setStep('capture');
+  }
+
+  /** From typed mode, back to live speech: forget any broken-mic flag and try
+   * again right away (a fresh user gesture also lets the permission prompt
+   * reappear where the platform allows it). */
+  function retrySpeech() {
+    persistVoiceMode(null);
+    failsRef.current = 0;
+    setNote(null);
+    setMode('speech');
+    startListening();
   }
 
   function startListening() {
@@ -255,11 +268,13 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
       recRef.current = null;
       if (suppressRef.current) return;
       if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
-        // Permission is gone for this session — settle into typing, no fuss.
+        // Mic permission is blocked — settle into typing, but say how to get
+        // the mic back and leave the door open via "use the microphone".
         persistVoiceMode('typed');
         setMode('typed');
         setNote(
-          'The mic isn’t available to Fibi here — no problem: the keyboard mic does the same job.',
+          'The mic is blocked for Fibi on this device — the keyboard mic works just as well. ' +
+            'To use the in-app mic: allow the Microphone in the app’s permissions (or the browser’s site settings), then tap “use the microphone” below.',
         );
         setStep('capture');
         return;
@@ -785,7 +800,7 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
             />
           </div>
           <p className="small muted vc-hint">
-            On iPhone, tap the 🎤 on the keyboard and just talk — no typing needed.
+            Tap the 🎤 on your keyboard and just talk — no typing needed.
           </p>
           <button
             className="btn btn-primary btn-block"
@@ -794,6 +809,11 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
           >
             Go
           </button>
+          {(window.SpeechRecognition ?? window.webkitSpeechRecognition) != null && (
+            <button className="vc-link" onClick={retrySpeech}>
+              🎤 use the microphone instead
+            </button>
+          )}
           {examples}
         </div>
       ) : step === 'listening' ? (
