@@ -26,8 +26,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # Pages serves the app under /my-fiber-tracker/, so build with that base.
-      - run: npm run build -- --base=/my-fiber-tracker/
+      # base path (/my-fiber-tracker/) lives in vite.config.ts
+      - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
