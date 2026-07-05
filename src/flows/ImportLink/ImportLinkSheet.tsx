@@ -62,6 +62,8 @@ export default function ImportLinkSheet({
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   // One controller per import attempt, so Cancel can abort the in-flight call.
   const abortRef = useRef<AbortController | null>(null);
+  // Distinguishes a hard-deadline abort from the user tapping Cancel.
+  const timedOutRef = useRef(false);
 
   const canImport = normalizeUrl(url) !== null;
 
@@ -89,11 +91,18 @@ export default function ImportLinkSheet({
     if (!link || !apiKey) return;
     const ctrl = new AbortController();
     abortRef.current = ctrl;
+    timedOutRef.current = false;
+    // Hard ceiling so the fetch spinner can never run away, whatever the
+    // network or model does.
+    const deadline = window.setTimeout(() => {
+      timedOutRef.current = true;
+      ctrl.abort();
+    }, 65_000);
     setSourceUrl(link);
     setStep('fetching');
     try {
       const ex = await extractMealFromUrl(link, apiKey, ctrl.signal);
-      if (ctrl.signal.aborted) return; // she cancelled — ignore a late result
+      if (ctrl.signal.aborted) return; // cancel/deadline handled below
       if (ex.fiberGramsPerServing == null) {
         setStep('nofiber');
         return;
@@ -112,13 +121,21 @@ export default function ImportLinkSheet({
       setFiberEdited(false);
       setStep('confirm');
     } catch (err) {
-      if (ctrl.signal.aborted) return; // cancelled — she's already back on 'input'
+      // User tapped Cancel (aborted, not by the deadline): already back on input.
+      if (ctrl.signal.aborted && !timedOutRef.current) return;
       setError(
-        err instanceof AiError
-          ? err
-          : new AiError('other', 'Import failed. Try again, or scan the recipe card instead.'),
+        timedOutRef.current
+          ? new AiError(
+              'other',
+              'That page is taking too long to read right now. Try again, or scan the recipe card instead.',
+            )
+          : err instanceof AiError
+            ? err
+            : new AiError('other', 'Import failed. Try again, or scan the recipe card instead.'),
       );
       setStep('error');
+    } finally {
+      window.clearTimeout(deadline);
     }
   }
 

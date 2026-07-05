@@ -451,35 +451,29 @@ Also:
 
   let messages: Anthropic.MessageParam[] = [{ role: 'user', content: prompt }];
   let response: Anthropic.Message;
-  // Cancellable + capped: the UI shows a Cancel button while fetching, and a
-  // hung request must not spin for the SDK's 10-minute default.
-  const requestOptions = { signal, timeout: 90_000 };
+  // Cancellable + tightly capped: the UI shows a Cancel button and enforces a
+  // hard overall deadline via `signal`, but each individual call is also
+  // bounded so a hung request can't sit on the SDK's 10-minute default.
+  const requestOptions = { signal, timeout: 55_000 };
+  // Reading one page and extracting a number is mechanical — low effort keeps
+  // the model from spending a long time thinking, which was the main slowdown.
+  const body = {
+    model: MODEL,
+    max_tokens: 1500,
+    tools: [{ type: 'web_fetch_20260209' as const, name: 'web_fetch' as const, max_uses: 2 }],
+    output_config: { effort: 'low' as const, format: { type: 'json_schema' as const, schema: URL_SCHEMA } },
+  };
   try {
-    response = await client.messages.create(
-      {
-        model: MODEL,
-        max_tokens: 2048,
-        tools: [{ type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 3 }],
-        output_config: { format: { type: 'json_schema', schema: URL_SCHEMA } },
-        messages,
-      },
-      requestOptions,
-    );
-    // Server-side tools may pause the turn; resume until the answer is done.
+    response = await client.messages.create({ ...body, messages }, requestOptions);
+    // A server tool may pause the turn once; resume a single time, then stop.
     let hops = 0;
-    while (response.stop_reason === 'pause_turn' && hops < 3) {
+    while (response.stop_reason === 'pause_turn' && hops < 1) {
       messages = [
         ...messages,
         { role: 'assistant', content: response.content as Anthropic.ContentBlockParam[] },
       ];
       response = await client.messages.create(
-        {
-          model: MODEL,
-          max_tokens: 2048,
-          tools: [{ type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 3 }],
-          output_config: { format: { type: 'json_schema', schema: URL_SCHEMA } },
-          messages,
-        },
+        { ...body, messages },
         requestOptions,
       );
       hops += 1;

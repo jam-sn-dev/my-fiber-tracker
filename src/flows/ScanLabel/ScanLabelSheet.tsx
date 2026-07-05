@@ -45,6 +45,9 @@ export default function ScanLabelSheet({
   const [chaseUrl, setChaseUrl] = useState(''); // saved with the food to reopen
   const [fiberEdited, setFiberEdited] = useState(false);
   const chaseAbort = useRef<AbortController | null>(null);
+  // Distinguishes a hard-deadline abort from the user tapping Cancel, so the
+  // deadline routes to the fallback form while Cancel just returns to pick.
+  const chaseTimedOut = useRef(false);
 
   useEffect(() => () => chaseAbort.current?.abort(), []);
 
@@ -119,9 +122,29 @@ export default function ScanLabelSheet({
 
     const ctrl = new AbortController();
     chaseAbort.current = ctrl;
+    chaseTimedOut.current = false;
+    // Hard ceiling: no matter what the network/model does, the spinner ends
+    // within this window and drops her onto the confirm form.
+    const deadline = window.setTimeout(() => {
+      chaseTimedOut.current = true;
+      ctrl.abort();
+    }, 65_000);
+
+    // Fallback form (she's holding the card): keep the meal name, leave fiber
+    // blank, and show why — the tappable page link is rendered on the form.
+    const toManual = (why: string) => {
+      setName(cardName);
+      setBrand(cardBrand);
+      setServing('1 serving');
+      setFiber('');
+      setWarn(why);
+      setTouched({});
+      setStep('confirm');
+    };
+
     try {
       const r = await extractMealFromUrl(url, apiKey, ctrl.signal);
-      if (ctrl.signal.aborted) return;
+      if (ctrl.signal.aborted) return; // Cancel or deadline handled below
       setName(r.mealName ?? cardName);
       setBrand(r.brand ?? cardBrand);
       setServing(r.servingLabel || '1 serving');
@@ -134,26 +157,24 @@ export default function ScanLabelSheet({
         );
       } else {
         setFiber('');
-        setWarn(`${host} didn’t show a fiber value for this meal — type it in below.`);
+        setWarn(`${host} didn’t show a fiber value for this meal — open it below, or type it in.`);
       }
       setTouched({});
       setStep('confirm');
     } catch (err) {
-      if (ctrl.signal.aborted) return;
-      // Don't dead-end: she's holding the card — open the confirm form with
-      // what the photo gave us and let her fill the fiber in herself.
-      setName(cardName);
-      setBrand(cardBrand);
-      setServing('1 serving');
-      setFiber('');
-      setWarn(
-        `The card links to ${host}, but the page couldn’t be read just now${
-          err instanceof AiError ? ` (${err.message.replace(/\.$/, '').toLowerCase()})` : ''
-        }. Type the fiber in below, or retake to try again.`,
-      );
-      setTouched({});
-      setStep('confirm');
+      // User tapped Cancel (aborted but not by the deadline): just stand down.
+      if (ctrl.signal.aborted && !chaseTimedOut.current) return;
+      if (chaseTimedOut.current) {
+        toManual(`Reading ${host} is taking too long right now — open it below to check the fiber, or type it in.`);
+      } else {
+        toManual(
+          `The card links to ${host}, but the page couldn’t be read just now${
+            err instanceof AiError ? ` (${err.message.replace(/\.$/, '').toLowerCase()})` : ''
+          }. Open it below, or type the fiber in.`,
+        );
+      }
     } finally {
+      window.clearTimeout(deadline);
       if (chaseAbort.current === ctrl) chaseAbort.current = null;
     }
   }
@@ -231,7 +252,10 @@ export default function ScanLabelSheet({
         <div className="lb-sc-center lb-sc-scanning" role="status">
           <div className="lb-sc-spin" aria-hidden="true" />
           <p className="lb-sc-lead">The card links to {chaseHost} — reading the nutrition page…</p>
-          <p className="small muted">Usually 15–30 seconds.</p>
+          <p className="small muted">
+            Usually 15–30 seconds. If the page is slow, this stops on its own and lets you finish by
+            hand.
+          </p>
           <button className="btn btn-ghost btn-block lb-sc-gap" onClick={cancelChase}>
             Cancel
           </button>
@@ -271,6 +295,16 @@ export default function ScanLabelSheet({
               : 'Read from your photo — check the numbers before saving.'}
           </div>
           {warn && <div className="lb-sc-strip lb-sc-strip-amber">{warn}</div>}
+          {chased && chaseUrl && (
+            <a
+              className="btn btn-ghost btn-block lb-sc-openlink"
+              href={chaseUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ↗ Open {chaseHost} to read the fiber
+            </a>
+          )}
 
           <div className="field">
             <label htmlFor="lb-sc-name">Name</label>

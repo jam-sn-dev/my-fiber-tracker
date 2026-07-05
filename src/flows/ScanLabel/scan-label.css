@@ -100,3 +100,7 @@
 .lb-sc-retake {
   margin-top: 10px;
 }
+.lb-sc-openlink {
+  margin: 4px 0 12px;
+  text-decoration: none;
+}
