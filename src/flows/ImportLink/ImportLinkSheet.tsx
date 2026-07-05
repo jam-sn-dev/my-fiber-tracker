@@ -92,6 +92,17 @@ export default function ImportLinkSheet({
   async function startImport() {
     const link = normalizeUrl(url);
     if (!link || !apiKey) return;
+    // Home Chef blocks automated page reading, so a fetch always fails there.
+    // Skip the ~15s dead-end and point straight at the reliable path.
+    try {
+      if (new URL(link).hostname.toLowerCase().includes('homechef')) {
+        setSourceUrl(link);
+        setStep('nofiber');
+        return;
+      }
+    } catch {
+      /* normalizeUrl already validated it; ignore */
+    }
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     timedOutRef.current = false;
@@ -320,8 +331,8 @@ export default function ImportLinkSheet({
           {cardNote && <p className="small il-card-note">{cardNote}</p>}
 
           <p className="small muted il-caption">
-            Works with Home Chef recipe pages — the card in the box prints the link, so a photo of
-            it fills the field for you.
+            Best for recipe sites that print nutrition. Home Chef blocks apps from reading its pages
+            — for Home Chef, screenshot the nutrition and use “Scan a label” instead.
           </p>
         </>
       ) : step === 'fetching' ? (
@@ -340,10 +351,11 @@ export default function ImportLinkSheet({
           <div className="il-big" aria-hidden="true">
             🍽️
           </div>
-          <p className="il-lead">Couldn’t read a fiber value from that page</p>
+          <p className="il-lead">Home Chef blocks apps from reading its pages</p>
           <p className="small muted">
-            Open the page to read it yourself — on Home Chef, tap “See Full Nutrition Facts” for the
-            Dietary Fiber line — then enter it here.
+            The reliable way: open the meal, screenshot its nutrition (or tap “See Full Nutrition
+            Facts”), and use <b>Scan a label</b> on that screenshot — Fibi reads it and works out the
+            fiber for you. Or read the number and type it here.
           </p>
           {sourceUrl && (
             <a
@@ -355,18 +367,18 @@ export default function ImportLinkSheet({
               ↗ Open the page
             </a>
           )}
+          <button className="btn btn-primary btn-block" onClick={scanInstead}>
+            Scan a screenshot
+          </button>
           <button
-            className="btn btn-primary btn-block"
+            className="btn btn-ghost btn-block"
             onClick={() => {
-              setWarn('Open the page above, read the fiber, and enter it here.');
+              setWarn('Read the fiber from the page you opened, and enter it here.');
               setTouched({});
               setStep('confirm');
             }}
           >
             Enter the fiber by hand
-          </button>
-          <button className="btn btn-ghost btn-block" onClick={() => setStep('input')}>
-            Try a different link
           </button>
         </div>
       ) : step === 'error' && error ? (

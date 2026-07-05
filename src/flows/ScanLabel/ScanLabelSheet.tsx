@@ -114,21 +114,11 @@ export default function ScanLabelSheet({
       host = 'the linked page';
     }
     const cardName = ex.productName ?? '';
-    const cardBrand = ex.brand ?? (host.includes('homechef') ? 'Home Chef' : '');
+    const isHomeChef = host.includes('homechef');
+    const cardBrand = ex.brand ?? (isHomeChef ? 'Home Chef' : '');
     setChaseHost(host);
     setChaseUrl(url);
     setChased(true);
-    setStep('chasing');
-
-    const ctrl = new AbortController();
-    chaseAbort.current = ctrl;
-    chaseTimedOut.current = false;
-    // Hard ceiling: no matter what the network/model does, the spinner ends
-    // within this window and drops her onto the confirm form.
-    const deadline = window.setTimeout(() => {
-      chaseTimedOut.current = true;
-      ctrl.abort();
-    }, 65_000);
 
     // Fallback form (she's holding the card): keep the meal name, leave fiber
     // blank, and show why — the tappable page link is rendered on the form.
@@ -141,6 +131,28 @@ export default function ScanLabelSheet({
       setTouched({});
       setStep('confirm');
     };
+
+    // Home Chef blocks automated page reading, so the fetch always fails there
+    // — don't waste ~15s (and an API call) proving it. Send her straight to the
+    // reliable path: open the page, screenshot its nutrition, scan that.
+    if (isHomeChef) {
+      toManual(
+        `Home Chef doesn’t let apps read its pages. Tap “Open ${host}” below, then screenshot the nutrition (or tap “See Full Nutrition Facts”) and use “Scan a label” on that screenshot — it fills the fiber in for you. Or read it and type it here.`,
+      );
+      return;
+    }
+
+    setStep('chasing');
+
+    const ctrl = new AbortController();
+    chaseAbort.current = ctrl;
+    chaseTimedOut.current = false;
+    // Hard ceiling: no matter what the network/model does, the spinner ends
+    // within this window and drops her onto the confirm form.
+    const deadline = window.setTimeout(() => {
+      chaseTimedOut.current = true;
+      ctrl.abort();
+    }, 65_000);
 
     try {
       const r = await extractMealFromUrl(url, apiKey, ctrl.signal);

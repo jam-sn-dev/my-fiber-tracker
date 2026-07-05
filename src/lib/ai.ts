@@ -7,6 +7,10 @@ export interface LabelExtraction {
   brand: string | null;
   servingLabel: string; // e.g. "1 slice (45 g)"
   fiberGramsPerServing: number;
+  // Captured so fiber can be derived when a panel/summary shows carbs but no
+  // fiber line (e.g. a Home Chef website screenshot). null when not shown.
+  totalCarbsGrams: number | null;
+  netCarbsGrams: number | null;
   confidence: 'high' | 'medium' | 'low';
   notes: string | null; // anything the user should double-check
   /**
@@ -50,7 +54,16 @@ const LABEL_SCHEMA = {
     },
     fiberGramsPerServing: {
       type: 'number',
-      description: 'Dietary fiber in grams per serving, as printed on the label',
+      description:
+        'Dietary fiber grams per serving if a "Dietary Fiber"/"Fiber" line is shown; 0 if there is no fiber line',
+    },
+    totalCarbsGrams: {
+      type: ['number', 'null'],
+      description: 'Total "Carbohydrates" grams per serving if shown, else null',
+    },
+    netCarbsGrams: {
+      type: ['number', 'null'],
+      description: 'Total "Net Carbs" grams per serving if shown, else null',
     },
     confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
     notes: {
@@ -69,6 +82,8 @@ const LABEL_SCHEMA = {
     'brand',
     'servingLabel',
     'fiberGramsPerServing',
+    'totalCarbsGrams',
+    'netCarbsGrams',
     'confidence',
     'notes',
     'nutritionUrl',
@@ -76,14 +91,14 @@ const LABEL_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-const PROMPT = `Read this photo of a food package's Nutrition Facts panel (or a meal-kit recipe card) and extract the dietary fiber information.
+const PROMPT = `Read this photo — a food Nutrition Facts panel, a meal-kit recipe card, or a screenshot of a recipe/meal-kit website's nutrition — and extract the fiber information.
 
 Rules:
-- fiberGramsPerServing is the DIETARY FIBER line (not total carbohydrate, not sugar), per serving.
-- If the label shows both per-serving and per-container columns, use the per-serving column and mention this in notes.
+- fiberGramsPerServing is the DIETARY FIBER line (not total carbohydrate, not sugar), per serving. If there is NO Dietary Fiber line at all, set it to 0.
+- ALSO report totalCarbsGrams (the "Carbohydrates" line) and netCarbsGrams (the "Net Carbs" line) whenever they are shown — some meal-kit nutrition (e.g. Home Chef) shows Carbohydrates and Net Carbs but no Dietary Fiber line, and the app derives fiber from those.
+- If the photo shows both per-serving and per-container columns, use the per-serving column and note it.
 - servingLabel is the serving size exactly as printed.
-- If you cannot clearly read the dietary fiber value, set confidence to "low" and explain in notes.
-- Meal-kit recipe cards (Home Chef and similar) often have NO Nutrition Facts panel and instead print a link like "View nutritional information at www.homechef.com/53562". If the photo shows such a URL, put it in nutritionUrl exactly as printed. If the card also shows no readable fiber value, set fiberGramsPerServing to 0 and confidence to "low" — the app will follow the link. Set productName to the dish name if it appears anywhere on the card, and brand to the meal-kit service name if identifiable.`;
+- Meal-kit recipe cards often have NO nutrition on them, just a link like "View nutritional information at www.homechef.com/53562". If the photo shows such a URL, put it in nutritionUrl exactly as printed and set fiberGramsPerServing to 0. Set productName to the dish name if shown and brand to the service name if identifiable.`;
 
 interface DecodedPhoto {
   source: CanvasImageSource;
@@ -214,14 +229,36 @@ export async function extractNutritionLabel(
   }
 
   parsed.nutritionUrl = parsed.nutritionUrl?.trim() || null;
-  const fiberOk =
-    typeof parsed.fiberGramsPerServing === 'number' && parsed.fiberGramsPerServing >= 0;
-  // A meal-kit card with just a nutrition link is a valid result — the caller
-  // follows the URL. Only fail when there's neither a fiber value nor a link.
-  if (!fiberOk && !parsed.nutritionUrl) {
-    throw new AiError('other', 'No dietary fiber value was found on the label.');
+  let fiberOk = typeof parsed.fiberGramsPerServing === 'number' && parsed.fiberGramsPerServing > 0;
+
+  // No Dietary Fiber line, but the panel/screenshot shows Carbohydrates and
+  // Net Carbs (the Home Chef case) — derive fiber = carbs − net carbs. Net
+  // carbs already exclude fiber, so the difference is the fiber.
+  const carbs = parsed.totalCarbsGrams;
+  const net = parsed.netCarbsGrams;
+  if (!fiberOk && typeof carbs === 'number' && typeof net === 'number' && carbs > net) {
+    const derived = Math.round((carbs - net) * 10) / 10;
+    parsed.fiberGramsPerServing = derived;
+    if (parsed.confidence === 'high') parsed.confidence = 'medium';
+    const note = `Derived: ${fmtG(carbs)} g carbs − ${fmtG(net)} g net carbs = ${fmtG(derived)} g fiber.`;
+    parsed.notes = parsed.notes ? `${parsed.notes} ${note}` : note;
+    fiberOk = derived > 0;
   }
-  if (!fiberOk) parsed.fiberGramsPerServing = 0;
+
+  const hasAnyFiber =
+    typeof parsed.fiberGramsPerServing === 'number' && parsed.fiberGramsPerServing >= 0 && fiberOk;
+  // A meal-kit card with just a nutrition link is still a valid result — the
+  // caller follows the URL. Only fail when there's no fiber, no derivable
+  // carbs, and no link.
+  if (!hasAnyFiber && !parsed.nutritionUrl) {
+    throw new AiError(
+      'other',
+      'No fiber (or carbs to derive it from) was found in that photo. Try a clearer shot of the nutrition.',
+    );
+  }
+  if (typeof parsed.fiberGramsPerServing !== 'number' || parsed.fiberGramsPerServing < 0) {
+    parsed.fiberGramsPerServing = 0;
+  }
   return parsed;
 }
 
