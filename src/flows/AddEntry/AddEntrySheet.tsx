@@ -156,27 +156,24 @@ export default function AddEntrySheet({
     }
   }
 
+  // Whatever lane saves a new food, drop it straight into this slot. The child
+  // sheet pops itself; this pops the AddEntry picker too, so she lands back on
+  // Today with the new entry visible — clear feedback, no chance of double-add.
+  const addSavedToSlot = async (food: Food) => {
+    await addEntry(date, makeFoodEntry(food, 1, slot));
+    onClose();
+  };
+
   function scanLabel() {
-    openModal({
-      type: 'scanLabel',
-      onSaved: async (food) => {
-        await addEntry(date, makeFoodEntry(food, 1, slot));
-        // The child sheet pops itself; this pops the AddEntry picker too, so
-        // she lands back on Today with the new entry visible — clear feedback
-        // that the save worked (and no chance of double-adding it).
-        onClose();
-      },
-    });
+    openModal({ type: 'scanLabel', onSaved: addSavedToSlot });
+  }
+
+  function importLink() {
+    openModal({ type: 'importLink', onSaved: addSavedToSlot });
   }
 
   function newFood() {
-    openModal({
-      type: 'foodForm',
-      onSaved: async (food) => {
-        await addEntry(date, makeFoodEntry(food, 1, slot));
-        onClose();
-      },
-    });
+    openModal({ type: 'foodForm', onSaved: addSavedToSlot });
   }
 
   async function runLookup() {
@@ -317,10 +314,13 @@ export default function AddEntrySheet({
 
       <div className="pk-ae-actions">
         <button className="btn-quiet" onClick={scanLabel}>
-          Scan a label
+          📷 Scan label / card
+        </button>
+        <button className="btn-quiet" onClick={importLink}>
+          🔗 From a link
         </button>
         <button className="btn-quiet" onClick={newFood}>
-          New food
+          ✏️ New food
         </button>
         <button
           className={quickOpen ? 'btn-quiet pk-ae-toggled' : 'btn-quiet'}
@@ -330,6 +330,10 @@ export default function AddEntrySheet({
           Quick add
         </button>
       </div>
+      <p className="small muted pk-ae-hint">
+        Meal-kit box (Home Chef)? <b>Scan label / card</b> reads the recipe card and grabs the fiber
+        — or paste the meal link with <b>From a link</b>.
+      </p>
 
       {quickOpen && (
         <div className="card pk-ae-quick">
@@ -382,7 +386,7 @@ export default function AddEntrySheet({
                       🔎 Look up “{query.trim()}” fiber
                     </button>
                     <span className="pk-ae-lookup-or small muted">
-                      or use “New food” / “Scan a label” above
+                      or scan it, paste a link, or type it in above
                     </span>
                   </>
                 )}

@@ -126,6 +126,14 @@
 .pk-ae-toggled {
   box-shadow: inset 0 0 0 1.5px var(--leaf);
 }
+.pk-ae-hint {
+  margin: -4px 2px 14px;
+  line-height: 1.45;
+}
+.pk-ae-hint b {
+  color: var(--leaf-deep);
+  font-weight: 650;
+}
 
 /* quick add form */
 .pk-ae-quick {
