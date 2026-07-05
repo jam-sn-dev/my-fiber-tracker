@@ -118,6 +118,23 @@
   white-space: nowrap;
 }
 
+/* source-page link (Home Chef etc.) — sits at the row's trailing edge */
+.lb-src {
+  flex: none;
+  width: 48px;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--leaf);
+  font-size: 19px;
+  text-decoration: none;
+  border-left: 1px solid var(--paper-2);
+}
+.lb-src:active {
+  background: var(--leaf-wash);
+}
+
 /* ---------- floating add button ---------- */
 .lb-fab {
   position: fixed;

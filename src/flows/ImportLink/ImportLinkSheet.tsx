@@ -56,6 +56,8 @@ export default function ImportLinkSheet({
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   // Did she correct the fiber value after the AI filled it? Drives sourcing.
   const [fiberEdited, setFiberEdited] = useState(false);
+  // The cleaned page URL, saved with the food so she can reopen it to confirm.
+  const [sourceUrl, setSourceUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   // One controller per import attempt, so Cancel can abort the in-flight call.
@@ -87,6 +89,7 @@ export default function ImportLinkSheet({
     if (!link || !apiKey) return;
     const ctrl = new AbortController();
     abortRef.current = ctrl;
+    setSourceUrl(link);
     setStep('fetching');
     try {
       const ex = await extractMealFromUrl(link, apiKey, ctrl.signal);
@@ -152,6 +155,7 @@ export default function ImportLinkSheet({
         // read is not a photographed label.
         source: fiberEdited ? ('manual' as const) : ('estimate' as const),
         favorite: false,
+        sourceUrl: sourceUrl || undefined,
       };
       const id = await addFood(fields);
       onSaved?.({ ...fields, timesUsed: 0, id });

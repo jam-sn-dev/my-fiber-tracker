@@ -42,6 +42,7 @@ export default function ScanLabelSheet({
   // Recipe-card chase: the photo carried a nutrition URL instead of a panel.
   const [chaseHost, setChaseHost] = useState('');
   const [chased, setChased] = useState(false);
+  const [chaseUrl, setChaseUrl] = useState(''); // saved with the food to reopen
   const [fiberEdited, setFiberEdited] = useState(false);
   const chaseAbort = useRef<AbortController | null>(null);
 
@@ -112,6 +113,7 @@ export default function ScanLabelSheet({
     const cardName = ex.productName ?? '';
     const cardBrand = ex.brand ?? (host.includes('homechef') ? 'Home Chef' : '');
     setChaseHost(host);
+    setChaseUrl(url);
     setChased(true);
     setStep('chasing');
 
@@ -175,6 +177,8 @@ export default function ScanLabelSheet({
         // she typed her own number.
         source: chased ? (fiberEdited ? ('manual' as const) : ('estimate' as const)) : ('label' as const),
         favorite: false,
+        // Keep the page we followed so she can reopen it to confirm the value.
+        sourceUrl: chased && chaseUrl ? chaseUrl : undefined,
       };
       const id = await addFood(fields);
       onSaved?.({ ...fields, timesUsed: 0, id });

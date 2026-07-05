@@ -20,6 +20,12 @@ export interface Food {
   timesUsed: number;
   lastUsed?: string; // date key YYYY-MM-DD
   slotCounts?: Partial<Record<Slot, number>>; // learned slot preferences
+  /**
+   * The web page this food's fiber came from (Home Chef recipe URL, etc.),
+   * kept so she can open it to confirm a derived value. Present only for
+   * foods added via the link-import or recipe-card lanes.
+   */
+  sourceUrl?: string;
 }
 
 export interface MealItem {

@@ -202,6 +202,19 @@ function FoodRow({ food }: { food: Food }) {
         </span>
         <span className="grams lb-row-g">{fmtG(food.fiberPerServing)} g</span>
       </button>
+      {food.sourceUrl && (
+        <a
+          className="lb-src"
+          href={food.sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Open the source page for ${food.name} to confirm its fiber`}
+          title="Open source page"
+          onClick={(e) => e.stopPropagation()}
+        >
+          ↗
+        </a>
+      )}
     </div>
   );
 }

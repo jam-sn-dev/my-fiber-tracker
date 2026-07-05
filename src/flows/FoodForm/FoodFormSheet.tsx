@@ -122,6 +122,17 @@ export default function FoodFormSheet({
         </div>
       )}
 
+      {existing?.sourceUrl && (
+        <a
+          className="lb-ff-src small"
+          href={existing.sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          ↗ Open the source page to confirm this fiber
+        </a>
+      )}
+
       <div className="field">
         <label htmlFor="lb-ff-name">Name</label>
         <input
