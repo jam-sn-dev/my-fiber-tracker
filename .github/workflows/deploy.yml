@@ -38,7 +38,16 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment-retry.outputs.page_url }}
     steps:
+      # GitHub Pages' publish step occasionally fails transiently
+      # ("Deployment failed, try again later"). Auto-retry once after a short
+      # settle so a flaky publish self-heals instead of needing a manual re-run.
       - id: deployment
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - if: steps.deployment.outcome == 'failure'
+        run: sleep 30
+      - id: deployment-retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4
