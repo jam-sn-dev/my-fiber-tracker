@@ -469,17 +469,20 @@ export async function extractMealFromUrl(
 
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
 
-  const prompt = `Fetch this recipe page and read its per-serving nutrition information: ${cleaned.href}
+  const prompt = `You have a web_fetch tool. Use it to load this recipe page, then report its per-serving nutrition.
 
-Report these fields from the page's PRINTED nutrition numbers (never guess from ingredients or the dish type):
-- fiberGramsPerServing: the "Dietary Fiber" / "Fiber" line if the page has one, else null.
-- totalCarbsGrams: the total "Carbohydrates" line if present, else null.
-- netCarbsGrams: the "Net Carbs" line if present, else null.
-Home Chef pages typically show Carbohydrates and Net Carbs but NO Dietary Fiber line — in that case fiberGramsPerServing is null and you MUST still report totalCarbsGrams and netCarbsGrams (the app derives fiber from them).
+URL to fetch: ${cleaned.href}
 
-Also:
-- mealName: the recipe title. brand: the service name (e.g. "Home Chef").
-- servingLabel: "1 serving" unless the page clearly defines something else.`;
+Steps:
+1. Call web_fetch on that URL to load the page. Do not answer before you have fetched it.
+2. Read these PRINTED nutrition numbers off the page (never guess from ingredients or the dish type): the "Dietary Fiber"/"Fiber" line if present; the total "Carbohydrates" line; and the "Net Carbs" line. Home Chef pages usually show Carbohydrates and Net Carbs but NO Dietary Fiber line.
+3. Reply with ONLY a JSON object — no prose, no markdown fences — with exactly these keys:
+{"mealName": string|null, "brand": string|null, "fiberGramsPerServing": number|null, "totalCarbsGrams": number|null, "netCarbsGrams": number|null, "servingLabel": string, "confidence": "high"|"medium"|"low", "notes": string|null}
+
+Rules:
+- fiberGramsPerServing: the Dietary Fiber line if the page has one, else null.
+- ALWAYS fill totalCarbsGrams and netCarbsGrams whenever the page shows them (the app derives fiber from these when there is no fiber line).
+- servingLabel: "1 serving" unless the page clearly says otherwise. brand: the service name, e.g. "Home Chef".`;
 
   let messages: Anthropic.MessageParam[] = [{ role: 'user', content: prompt }];
   let response: Anthropic.Message;
@@ -487,13 +490,16 @@ Also:
   // hard overall deadline via `signal`, but each individual call is also
   // bounded so a hung request can't sit on the SDK's 10-minute default.
   const requestOptions = { signal, timeout: 55_000 };
-  // Medium effort: enough to fetch the page and read the numbers reliably
-  // (low effort skipped fields), still bounded by the caller's hard deadline.
+  // No structured-output `format` here: forcing a JSON schema alongside a
+  // server tool makes the model emit the JSON immediately WITHOUT ever calling
+  // web_fetch, so every field comes back null. Instead we let it use the tool
+  // freely, ask for JSON in the prompt, and parse it loosely from the reply.
+  // Medium effort keeps it fetching + reading reliably within the hard cap.
   const body = {
     model: MODEL,
     max_tokens: 1500,
     tools: [{ type: 'web_fetch_20260209' as const, name: 'web_fetch' as const, max_uses: 2 }],
-    output_config: { effort: 'medium' as const, format: { type: 'json_schema' as const, schema: URL_SCHEMA } },
+    output_config: { effort: 'medium' as const },
   };
   try {
     response = await client.messages.create({ ...body, messages }, requestOptions);

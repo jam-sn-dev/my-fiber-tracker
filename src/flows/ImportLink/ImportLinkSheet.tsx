@@ -106,14 +106,17 @@ export default function ImportLinkSheet({
     try {
       const ex = await extractMealFromUrl(link, apiKey, ctrl.signal);
       if (ctrl.signal.aborted) return; // cancel/deadline handled below
-      if (ex.fiberGramsPerServing == null) {
-        setStep('nofiber');
-        return;
-      }
       const host = new URL(link).hostname.toLowerCase();
+      // Capture whatever the read gave us either way, so the no-fiber path can
+      // still hand her a mostly-filled manual form (not a dead end).
       setName(ex.mealName ?? '');
       setBrand(ex.brand || (host.includes('homechef') ? 'Home Chef' : ''));
       setServing(ex.servingLabel || '1 serving');
+      if (ex.fiberGramsPerServing == null) {
+        setFiber('');
+        setStep('nofiber');
+        return;
+      }
       setFiber(fmtG(ex.fiberGramsPerServing));
       setWarn(
         ex.confidence !== 'high' || ex.notes
@@ -337,13 +340,30 @@ export default function ImportLinkSheet({
           <div className="il-big" aria-hidden="true">
             🍽️
           </div>
-          <p className="il-lead">That page doesn’t show a fiber value</p>
+          <p className="il-lead">Couldn’t read a fiber value from that page</p>
           <p className="small muted">
-            Some sites hide nutrition from readers — nothing you did wrong. The recipe card in the
-            box always works: scan its Nutrition Facts panel instead.
+            Open the page to read it yourself — on Home Chef, tap “See Full Nutrition Facts” for the
+            Dietary Fiber line — then enter it here.
           </p>
-          <button className="btn btn-primary btn-block il-gap" onClick={scanInstead}>
-            Scan the recipe card
+          {sourceUrl && (
+            <a
+              className="btn btn-ghost btn-block il-gap"
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ↗ Open the page
+            </a>
+          )}
+          <button
+            className="btn btn-primary btn-block"
+            onClick={() => {
+              setWarn('Open the page above, read the fiber, and enter it here.');
+              setTouched({});
+              setStep('confirm');
+            }}
+          >
+            Enter the fiber by hand
           </button>
           <button className="btn btn-ghost btn-block" onClick={() => setStep('input')}>
             Try a different link
