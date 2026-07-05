@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { fmtG } from './fiber';
 
 /** What Claude extracts from a photo of a Nutrition Facts panel. */
 export interface LabelExtraction {
@@ -396,6 +397,10 @@ export interface UrlMealExtraction {
   mealName: string | null;
   brand: string | null;
   fiberGramsPerServing: number | null; // null = the page didn't show fiber
+  // Reported so the app can derive fiber itself (Home Chef prints these but no
+  // fiber line): fiber = totalCarbs − netCarbs. Null when not on the page.
+  totalCarbsGrams: number | null;
+  netCarbsGrams: number | null;
   servingLabel: string;
   confidence: 'high' | 'medium' | 'low';
   notes: string | null;
@@ -411,7 +416,16 @@ const URL_SCHEMA = {
     },
     fiberGramsPerServing: {
       type: ['number', 'null'],
-      description: 'Dietary fiber grams PER SERVING from the page nutrition info; null if not shown',
+      description:
+        'Dietary fiber grams PER SERVING, if the page shows a "Dietary Fiber"/"Fiber" line. null if there is no such line.',
+    },
+    totalCarbsGrams: {
+      type: ['number', 'null'],
+      description: 'Total "Carbohydrates" grams per serving from the page, else null',
+    },
+    netCarbsGrams: {
+      type: ['number', 'null'],
+      description: 'Total "Net Carbs" grams per serving from the page, else null',
     },
     servingLabel: { type: 'string', description: 'Usually exactly "1 serving"' },
     confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
@@ -420,7 +434,16 @@ const URL_SCHEMA = {
       description: 'e.g. fiber was per container, or the page hid nutrition behind scripts',
     },
   },
-  required: ['mealName', 'brand', 'fiberGramsPerServing', 'servingLabel', 'confidence', 'notes'],
+  required: [
+    'mealName',
+    'brand',
+    'fiberGramsPerServing',
+    'totalCarbsGrams',
+    'netCarbsGrams',
+    'servingLabel',
+    'confidence',
+    'notes',
+  ],
   additionalProperties: false,
 } as const;
 
@@ -446,12 +469,13 @@ export async function extractMealFromUrl(
 
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
 
-  const prompt = `Fetch this recipe page and extract its dietary fiber information: ${cleaned.href}
+  const prompt = `Fetch this recipe page and read its per-serving nutrition information: ${cleaned.href}
 
-Rules for fiberGramsPerServing (per serving, from the page's printed nutrition information only):
-1. If the page lists "Dietary Fiber" (or "Fiber") directly, use that value with confidence "high".
-2. Otherwise, if the page lists BOTH total "Carbohydrates" AND "Net Carbs" (Home Chef pages do this), derive fiber = carbohydrates minus net carbs. Set confidence to "medium" and state the arithmetic in notes, e.g. "Derived: 56 g carbs − 53 g net carbs = 3 g fiber — the recipe card in the box can confirm."
-3. If neither is available, return null. NEVER guess fiber from the ingredients or the dish type.
+Report these fields from the page's PRINTED nutrition numbers (never guess from ingredients or the dish type):
+- fiberGramsPerServing: the "Dietary Fiber" / "Fiber" line if the page has one, else null.
+- totalCarbsGrams: the total "Carbohydrates" line if present, else null.
+- netCarbsGrams: the "Net Carbs" line if present, else null.
+Home Chef pages typically show Carbohydrates and Net Carbs but NO Dietary Fiber line — in that case fiberGramsPerServing is null and you MUST still report totalCarbsGrams and netCarbsGrams (the app derives fiber from them).
 
 Also:
 - mealName: the recipe title. brand: the service name (e.g. "Home Chef").
@@ -463,13 +487,13 @@ Also:
   // hard overall deadline via `signal`, but each individual call is also
   // bounded so a hung request can't sit on the SDK's 10-minute default.
   const requestOptions = { signal, timeout: 55_000 };
-  // Reading one page and extracting a number is mechanical — low effort keeps
-  // the model from spending a long time thinking, which was the main slowdown.
+  // Medium effort: enough to fetch the page and read the numbers reliably
+  // (low effort skipped fields), still bounded by the caller's hard deadline.
   const body = {
     model: MODEL,
     max_tokens: 1500,
     tools: [{ type: 'web_fetch_20260209' as const, name: 'web_fetch' as const, max_uses: 2 }],
-    output_config: { effort: 'low' as const, format: { type: 'json_schema' as const, schema: URL_SCHEMA } },
+    output_config: { effort: 'medium' as const, format: { type: 'json_schema' as const, schema: URL_SCHEMA } },
   };
   try {
     response = await client.messages.create({ ...body, messages }, requestOptions);
@@ -506,6 +530,22 @@ Also:
 
   const parsed = parseJsonLoose<UrlMealExtraction>(finalText(response));
   if (!parsed.servingLabel) parsed.servingLabel = '1 serving';
+
+  // Deterministic derivation: if the page gave no fiber line but did print
+  // Carbohydrates and Net Carbs (the Home Chef case), compute the fiber here
+  // rather than relying on the model to do the arithmetic. Net carbs already
+  // exclude fiber, so fiber = total carbs − net carbs.
+  const hasFiber = typeof parsed.fiberGramsPerServing === 'number' && parsed.fiberGramsPerServing >= 0;
+  const carbs = parsed.totalCarbsGrams;
+  const net = parsed.netCarbsGrams;
+  if (!hasFiber && typeof carbs === 'number' && typeof net === 'number' && carbs > net) {
+    const derived = Math.round((carbs - net) * 10) / 10;
+    parsed.fiberGramsPerServing = derived;
+    parsed.confidence = 'medium';
+    const note = `Derived from the page: ${fmtG(carbs)} g carbs − ${fmtG(net)} g net carbs = ${fmtG(derived)} g fiber. Open the page to confirm.`;
+    parsed.notes = parsed.notes ? `${parsed.notes} ${note}` : note;
+  }
+
   return parsed;
 }
 
