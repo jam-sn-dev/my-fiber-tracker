@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Sheet from '../../components/Sheet';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { db } from '../../db/db';
 import { addEntry, addFood, ensureDay, makeFoodEntry, setDayTarget } from '../../db/repo';
 import {
@@ -154,6 +155,7 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
   const [saveError, setSaveError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [doneMsg, setDoneMsg] = useState('');
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   // A pending clarifying question from the parser: the next utterance (spoken
   // or typed) is parsed as its ANSWER, not as a brand-new command. Mirrored in
@@ -859,15 +861,20 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
   /**
    * The confirm step holds a paid AI parse plus any hand-edits; parsing holds
    * a paid in-flight call. A stray backdrop tap must not silently discard
-   * either (the unmount cleanup already aborts an in-flight parse).
+   * either (the unmount cleanup already aborts an in-flight parse) — so we
+   * route through an in-app confirm dialog instead of closing outright.
    */
   function requestClose() {
     const guarded = step === 'parsing' || (step === 'confirm' && command?.intent !== 'unknown');
-    if (guarded && !window.confirm('Discard this?')) return;
+    if (guarded) {
+      setConfirmDiscard(true);
+      return;
+    }
     onClose();
   }
 
   return (
+   <>
     <Sheet title="Just say it" onClose={requestClose}>
       {settings === undefined ? null : !apiKey ? (
         <div className="vc-center">
@@ -1000,5 +1007,20 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
         renderConfirm(command)
       ) : null}
     </Sheet>
+    {confirmDiscard && (
+      <ConfirmDialog
+        title="Discard this?"
+        message="What you said hasn’t been saved yet."
+        confirmLabel="Discard"
+        cancelLabel="Keep going"
+        danger
+        onConfirm={() => {
+          setConfirmDiscard(false);
+          onClose();
+        }}
+        onCancel={() => setConfirmDiscard(false)}
+      />
+    )}
+   </>
   );
 }

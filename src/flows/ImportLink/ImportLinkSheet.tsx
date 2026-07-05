@@ -1,6 +1,7 @@
 import { useRef, useState, type KeyboardEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Sheet from '../../components/Sheet';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { db } from '../../db/db';
 import { addFood } from '../../db/repo';
 import { AiError, extractMealFromUrl } from '../../lib/ai';
@@ -56,6 +57,7 @@ export default function ImportLinkSheet({
   // Did she correct the fiber value after the AI filled it? Drives sourcing.
   const [fiberEdited, setFiberEdited] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   // One controller per import attempt, so Cancel can abort the in-flight call.
   const abortRef = useRef<AbortController | null>(null);
 
@@ -168,10 +170,8 @@ export default function ImportLinkSheet({
    * backdrop tap must not silently discard it (or an in-flight fetch).
    */
   function requestClose() {
-    if (
-      (step === 'confirm' || step === 'fetching') &&
-      !window.confirm('Discard this imported recipe?')
-    ) {
+    if (step === 'confirm' || step === 'fetching') {
+      setConfirmDiscard(true);
       return;
     }
     abortRef.current?.abort();
@@ -179,6 +179,7 @@ export default function ImportLinkSheet({
   }
 
   return (
+   <>
     <Sheet title="From a link" onClose={requestClose}>
       {settings === undefined ? null : !apiKey ? (
         <div className="il-center">
@@ -363,5 +364,21 @@ export default function ImportLinkSheet({
         </>
       )}
     </Sheet>
+    {confirmDiscard && (
+      <ConfirmDialog
+        title="Discard this recipe?"
+        message="The imported details haven’t been saved to your library yet."
+        confirmLabel="Discard"
+        cancelLabel="Keep it"
+        danger
+        onConfirm={() => {
+          setConfirmDiscard(false);
+          abortRef.current?.abort();
+          onClose();
+        }}
+        onCancel={() => setConfirmDiscard(false)}
+      />
+    )}
+   </>
   );
 }

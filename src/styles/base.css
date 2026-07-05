@@ -238,6 +238,58 @@ h1, h2, h3, h4, p {
   .sheet, .sheet-backdrop { animation: none; }
 }
 
+/* ---------- confirm dialog ---------- */
+.cd-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(34, 43, 32, 0.45);
+  z-index: 60;
+  animation: fade-in 0.12s ease;
+}
+.cd-dialog {
+  position: fixed;
+  z-index: 61;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: calc(100% - 48px);
+  max-width: 340px;
+  background: var(--card);
+  border-radius: var(--r-lg);
+  padding: 22px 20px 16px;
+  box-shadow: 0 16px 48px rgba(34, 43, 32, 0.28);
+  animation: cd-pop 0.16s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.cd-title {
+  font-size: 18px;
+  font-weight: 750;
+  margin-bottom: 6px;
+}
+.cd-message {
+  font-size: 15px;
+  color: var(--muted);
+  line-height: 1.45;
+  margin-bottom: 18px;
+}
+.cd-actions {
+  display: flex;
+  gap: 10px;
+}
+.cd-btn {
+  flex: 1;
+}
+.cd-confirm-danger {
+  background: var(--danger);
+  color: #fff;
+}
+@keyframes cd-pop {
+  from { transform: translate(-50%, calc(-50% + 8px)); opacity: 0.5; }
+  to { transform: translate(-50%, -50%); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cd-dialog, .cd-backdrop { animation: none; }
+}
+
 /* ---------- tab bar ---------- */
 .tabbar {
   flex: none;
