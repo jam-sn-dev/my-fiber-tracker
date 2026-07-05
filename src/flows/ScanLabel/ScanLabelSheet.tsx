@@ -1,0 +1,229 @@
+import { useState, type ChangeEvent } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import Sheet from '../../components/Sheet';
+import { db } from '../../db/db';
+import { addFood } from '../../db/repo';
+import { AiError, extractNutritionLabel } from '../../lib/ai';
+import { parseGrams } from '../../lib/fiber';
+import { useNav } from '../../nav';
+import { DEFAULT_SETTINGS, type Food } from '../../types';
+import './scan-label.css';
+
+type Step = 'pick' | 'scanning' | 'confirm' | 'error';
+
+export default function ScanLabelSheet({
+  onSaved,
+  onClose,
+}: {
+  onSaved?: (food: Food) => void;
+  onClose: () => void;
+}) {
+  const { openModal } = useNav();
+
+  // Live so that when Settings (stacked on top) saves a key and closes,
+  // this sheet notices on its own — no manual re-check needed.
+  const settings = useLiveQuery(async () => (await db.settings.get('app')) ?? DEFAULT_SETTINGS, []);
+  const apiKey = settings?.apiKey?.trim() ?? '';
+
+  const [step, setStep] = useState<Step>('pick');
+  const [error, setError] = useState<AiError | null>(null);
+  const [warn, setWarn] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [brand, setBrand] = useState('');
+  const [serving, setServing] = useState('');
+  const [fiber, setFiber] = useState('');
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [busy, setBusy] = useState(false);
+
+  const fiberNum = parseGrams(fiber);
+  const nameOk = name.trim().length > 0;
+  const servingOk = serving.trim().length > 0;
+  const fiberOk = fiber.trim().length > 0 && Number.isFinite(fiberNum) && fiberNum >= 0;
+  const valid = nameOk && servingOk && fiberOk;
+
+  const touch = (k: string) => setTouched((t) => ({ ...t, [k]: true }));
+
+  async function handleFile(e: ChangeEvent<HTMLInputElement>) {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    input.value = ''; // let her pick the same photo again after a retake
+    if (!file || !apiKey) return;
+    setStep('scanning');
+    try {
+      const ex = await extractNutritionLabel(file, apiKey);
+      // Join productName + brand sensibly: name gets the product name,
+      // falling back to the brand alone if that's all the label showed.
+      setName(ex.productName ?? ex.brand ?? '');
+      setBrand(ex.productName ? (ex.brand ?? '') : '');
+      setServing(ex.servingLabel ?? '');
+      setFiber(String(ex.fiberGramsPerServing));
+      setWarn(
+        ex.confidence !== 'high' || ex.notes
+          ? (ex.notes ?? 'The photo wasn’t fully clear — give these numbers a second look.')
+          : null,
+      );
+      setTouched({});
+      setStep('confirm');
+    } catch (err) {
+      setError(
+        err instanceof AiError
+          ? err
+          : new AiError('other', 'Scan failed. Try again, or type the food in instead.'),
+      );
+      setStep('error');
+    }
+  }
+
+  async function save() {
+    if (!valid || busy) return;
+    setBusy(true);
+    try {
+      const fields = {
+        name: name.trim(),
+        brand: brand.trim() || undefined,
+        servingLabel: serving.trim(),
+        fiberPerServing: fiberNum,
+        source: 'label' as const,
+        favorite: false,
+      };
+      const id = await addFood(fields);
+      onSaved?.({ ...fields, timesUsed: 0, id });
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Sheet title="Scan a label" onClose={onClose}>
+      {settings === undefined ? null : !apiKey ? (
+        <div className="lb-sc-center">
+          <div className="lb-sc-big" aria-hidden="true">
+            📷
+          </div>
+          <p className="lb-sc-lead">
+            Fibi can read a photo of a Nutrition Facts panel and fill the numbers in for you.
+          </p>
+          <p className="small muted">
+            Label scanning uses AI, which needs a one-time API key — Justin sets this up once in
+            Settings. Everything else in Fibi works without it.
+          </p>
+          <button
+            className="btn btn-primary btn-block lb-sc-gap"
+            onClick={() => openModal({ type: 'settings' })}
+          >
+            Open Settings
+          </button>
+        </div>
+      ) : step === 'pick' ? (
+        <div className="lb-sc-center">
+          <label className="lb-sc-cam">
+            <input type="file" accept="image/*" capture="environment" hidden onChange={handleFile} />
+            <span className="lb-sc-cam-ico" aria-hidden="true">
+              📷
+            </span>
+            <span>Snap the Nutrition Facts panel</span>
+          </label>
+          <label className="btn btn-ghost btn-block lb-sc-roll">
+            <input type="file" accept="image/*" hidden onChange={handleFile} />
+            Choose from photos
+          </label>
+          <p className="small muted">Works on screenshots too.</p>
+        </div>
+      ) : step === 'scanning' ? (
+        <div className="lb-sc-center lb-sc-scanning" role="status">
+          <div className="lb-sc-spin" aria-hidden="true" />
+          <p className="lb-sc-lead">Reading the label…</p>
+          <p className="small muted">Usually just a few seconds.</p>
+        </div>
+      ) : step === 'error' && error ? (
+        <div className="lb-sc-center">
+          <p className="lb-sc-lead">{error.message}</p>
+          <button
+            className="btn btn-primary btn-block lb-sc-gap"
+            onClick={() => {
+              setError(null);
+              setStep('pick');
+            }}
+          >
+            Try again
+          </button>
+          {error.kind === 'auth' && (
+            <button
+              className="btn btn-ghost btn-block"
+              onClick={() => openModal({ type: 'settings' })}
+            >
+              Open Settings
+            </button>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="lb-sc-strip lb-sc-strip-leaf">
+            Read from your photo — check the numbers before saving.
+          </div>
+          {warn && <div className="lb-sc-strip lb-sc-strip-amber">{warn}</div>}
+
+          <div className="field">
+            <label htmlFor="lb-sc-name">Name</label>
+            <input
+              id="lb-sc-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={() => touch('name')}
+              placeholder="What the package calls it"
+            />
+            {touched.name && !nameOk && (
+              <span className="lb-sc-err small">Give it a name so you can find it again.</span>
+            )}
+          </div>
+
+          <div className="field">
+            <label htmlFor="lb-sc-brand">
+              Brand <span className="lb-sc-opt">optional</span>
+            </label>
+            <input id="lb-sc-brand" value={brand} onChange={(e) => setBrand(e.target.value)} />
+          </div>
+
+          <div className="field">
+            <label htmlFor="lb-sc-serving">Serving</label>
+            <input
+              id="lb-sc-serving"
+              value={serving}
+              onChange={(e) => setServing(e.target.value)}
+              onBlur={() => touch('serving')}
+              placeholder="1 slice (45 g)"
+            />
+            {touched.serving && !servingOk && (
+              <span className="lb-sc-err small">Describe one serving — any wording works.</span>
+            )}
+          </div>
+
+          <div className="field">
+            <label htmlFor="lb-sc-fiber">Fiber per serving (grams)</label>
+            <input
+              id="lb-sc-fiber"
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              min="0"
+              value={fiber}
+              onChange={(e) => setFiber(e.target.value)}
+              onBlur={() => touch('fiber')}
+            />
+            {touched.fiber && !fiberOk && (
+              <span className="lb-sc-err small">Enter the fiber grams — 0 or more.</span>
+            )}
+          </div>
+
+          <button className="btn btn-primary btn-block" disabled={!valid || busy} onClick={save}>
+            Save to library
+          </button>
+          <button className="btn btn-ghost btn-block lb-sc-retake" onClick={() => setStep('pick')}>
+            Retake
+          </button>
+        </>
+      )}
+    </Sheet>
+  );
+}

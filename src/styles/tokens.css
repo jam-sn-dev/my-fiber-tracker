@@ -1,0 +1,32 @@
+:root {
+  /* palette — leaf green primary, berry accent, warm paper ground */
+  --paper: #fcfcf9;
+  --paper-2: #f4f6f2;
+  --card: #ffffff;
+  --ink: #222b20;
+  --muted: #6b7566;
+  --faint: #98a292;
+  --line: #e3e8df;
+  --leaf: #2e7b45;
+  --leaf-deep: #1f5a32;
+  --leaf-tint: #a9cdb4;
+  --leaf-wash: #e8f0e7;
+  --berry: #be3d66;
+  --berry-wash: #f7e9ee;
+  --amber: #d9a441;
+  --danger: #b3402e;
+
+  /* type */
+  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+
+  /* shape & spacing */
+  --r-sm: 9px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --shadow-sheet: 0 -8px 32px rgba(34, 43, 32, 0.14);
+  --shadow-fab: 0 6px 14px rgba(31, 90, 50, 0.35);
+
+  /* safe areas (iOS standalone) */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}

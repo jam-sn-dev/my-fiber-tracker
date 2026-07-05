@@ -1,0 +1,83 @@
+/* FoodForm flow — every class carries the lb-ff- prefix (Library module). */
+
+.lb-ff-loading {
+  min-height: 240px;
+}
+
+.lb-ff-note {
+  background: #f6edd8;
+  color: #7c5f1d;
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  line-height: 1.45;
+}
+
+.lb-ff-opt {
+  font-weight: 500;
+  color: var(--faint);
+}
+
+.lb-ff-err {
+  color: var(--danger);
+}
+
+.lb-ff-fav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--card);
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--muted);
+  text-align: left;
+  margin-bottom: 16px;
+}
+.lb-ff-fav.on {
+  border-color: var(--amber);
+  background: #fdf7ea;
+  color: var(--ink);
+}
+.lb-ff-fav-star {
+  font-size: 20px;
+  line-height: 1;
+  color: var(--faint);
+}
+.lb-ff-fav.on .lb-ff-fav-star {
+  color: var(--amber);
+}
+
+.lb-ff-save {
+  margin-bottom: 12px;
+}
+
+.lb-ff-del-row {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 8px;
+}
+
+.lb-ff-confirm {
+  padding: 14px;
+  margin: 4px 0 8px;
+}
+.lb-ff-confirm p {
+  margin-bottom: 12px;
+  color: var(--muted);
+}
+.lb-ff-confirm-btns {
+  display: flex;
+  gap: 10px;
+}
+.lb-ff-confirm-btns .btn {
+  flex: 1;
+}
+.lb-ff-danger {
+  background: var(--danger);
+  color: #fff;
+}

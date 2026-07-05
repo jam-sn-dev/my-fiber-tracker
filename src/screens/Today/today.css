@@ -1,0 +1,290 @@
+/* Today screen — every class prefixed td- to avoid collisions. */
+
+/* ---------- header ---------- */
+.td-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.td-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 2px;
+}
+.td-target-chip {
+  min-height: 44px;
+  padding: 0 14px;
+}
+.td-gear {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--paper-2);
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---------- install nudge ---------- */
+.td-install {
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.td-install-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.td-install-dismiss {
+  flex: none;
+  min-height: 44px;
+}
+
+/* ---------- inline target editor ---------- */
+.td-target-editor {
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.td-target-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.td-step {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--line);
+  background: var(--card);
+  color: var(--leaf-deep);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.td-step:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.td-target-input {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 10px 8px;
+  min-height: 44px;
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--card);
+}
+.td-target-input:focus {
+  outline: none;
+  border-color: var(--leaf);
+}
+.td-target-save {
+  flex: none;
+}
+.td-target-note {
+  margin-top: 8px;
+}
+
+/* ---------- ring & legend ---------- */
+.td-ring-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 16px;
+}
+.td-ring-big {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  color: var(--leaf-deep);
+  font-variant-numeric: tabular-nums;
+}
+.td-ring-small {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1.3;
+  max-width: 104px;
+  margin-top: 2px;
+}
+.td-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.td-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.td-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+.td-dot-eaten {
+  background: var(--leaf);
+}
+.td-dot-planned {
+  background: var(--leaf-tint);
+}
+
+/* ---------- fill the gap ---------- */
+.td-fill-gap {
+  margin-bottom: 16px;
+}
+
+/* ---------- empty-day quick start ---------- */
+.td-empty {
+  padding: 18px 16px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+.td-empty-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* ---------- slot cards ---------- */
+.td-slot {
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.td-slot-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+  padding: 12px 14px 4px;
+}
+.td-entry {
+  display: flex;
+  align-items: stretch;
+  min-height: 52px;
+}
+.td-check {
+  width: 52px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.td-check-circle {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--leaf-tint);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.td-check-circle.td-on {
+  background: var(--leaf);
+  border-color: var(--leaf);
+}
+.td-entry-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px 8px 0;
+  text-align: left;
+  font-size: 16px;
+}
+.td-entry-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.td-entry.td-eaten .td-entry-name {
+  color: var(--muted);
+}
+.td-entry-g {
+  flex: none;
+}
+.td-add-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin: 6px 12px 12px;
+  width: calc(100% - 24px);
+  border: 1.5px dashed var(--line);
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 650;
+}
+
+/* ---------- entry options sheet ---------- */
+.td-opt-sub {
+  padding: 2px 0 6px;
+}
+.td-opt-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 6px 0 4px;
+}
+.td-qty-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+}
+.td-qty-label {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--muted);
+}
+.td-qty-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.td-qty-val {
+  min-width: 56px;
+  text-align: center;
+  font-size: 17px;
+}
+.td-remove {
+  align-self: center;
+  min-height: 44px;
+  padding: 10px 22px;
+}

@@ -1,0 +1,82 @@
+/* FillGap suggestions — every class prefixed pk-fg- */
+
+.pk-fg-head {
+  font-size: 16px;
+  font-weight: 650;
+  margin: 4px 2px 14px;
+}
+.pk-fg-gap {
+  font-size: 21px;
+}
+
+.pk-fg-loading {
+  text-align: center;
+  padding: 24px 0;
+}
+
+.pk-fg-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pk-fg-card {
+  padding: 13px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.pk-fg-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.pk-fg-title {
+  font-weight: 700;
+  min-width: 0;
+}
+.pk-fg-top .grams {
+  flex: none;
+  font-size: 17px;
+}
+.pk-fg-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.pk-fg-addbtn {
+  min-height: 44px;
+  min-width: 84px;
+}
+
+.pk-fg-more {
+  margin-top: 14px;
+  min-height: 48px;
+}
+.pk-fg-note {
+  text-align: center;
+  margin-top: 10px;
+}
+.pk-fg-foot {
+  text-align: center;
+  margin: 16px 10px 6px;
+  line-height: 1.5;
+}
+
+/* goal met state */
+.pk-fg-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 26px 10px 10px;
+}
+.pk-fg-done-title {
+  font-size: 21px;
+  font-weight: 750;
+}
+.pk-fg-done .btn {
+  margin-top: 8px;
+}

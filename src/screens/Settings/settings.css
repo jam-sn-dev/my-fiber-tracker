@@ -1,0 +1,198 @@
+/* Settings sheet — every class prefixed "st-" (module-private). */
+
+.st-settings {
+  padding-top: 4px;
+}
+
+.st-section {
+  margin: 4px 0 26px;
+}
+
+.st-label {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.st-caption {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin-top: 10px;
+}
+
+/* ---------- steppers ---------- */
+.st-stepper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.st-step-btn {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--card);
+  color: var(--leaf-deep);
+  font-size: 22px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.st-step-btn:active {
+  background: var(--leaf-wash);
+}
+.st-step-btn:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.st-target-input {
+  width: 88px;
+  min-height: 44px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--card);
+  padding: 8px;
+}
+.st-target-input:focus {
+  outline: none;
+  border-color: var(--leaf);
+}
+/* hide native number-input spinners; the app steppers do that job */
+.st-target-input::-webkit-outer-spin-button,
+.st-target-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.st-unit {
+  font-weight: 650;
+  color: var(--muted);
+}
+
+.st-stepper-value {
+  min-width: 76px;
+  text-align: center;
+  font-size: 17px;
+}
+
+/* ---------- API key ---------- */
+.st-key-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.st-key-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 12px;
+  background: var(--card);
+}
+.st-key-input:focus {
+  outline: none;
+  border-color: var(--leaf);
+}
+
+.st-key-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.st-masked {
+  letter-spacing: 0.04em;
+}
+
+.st-key-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.st-touch {
+  min-height: 44px;
+}
+
+/* ---------- your data ---------- */
+.st-data-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.st-hidden {
+  display: none;
+}
+
+.st-note {
+  font-size: 14px;
+  line-height: 1.5;
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  margin-top: 10px;
+}
+.st-note-ok {
+  background: var(--leaf-wash);
+  color: var(--leaf-deep);
+}
+.st-note-err {
+  background: #f8ebe8;
+  color: var(--danger);
+}
+
+.st-confirm {
+  padding: 14px;
+  margin-top: 10px;
+}
+.st-confirm-text {
+  font-size: 14.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.st-confirm-btns {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+.st-confirm-btns .btn {
+  flex: 1;
+}
+
+.st-btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* ---------- about ---------- */
+.st-about {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px;
+}
+
+.st-app-name {
+  font-weight: 750;
+  font-size: 17px;
+}
+
+.st-install {
+  margin-top: 10px;
+  background: var(--leaf-wash);
+  color: var(--leaf-deep);
+  border-radius: var(--r-md);
+  padding: 14px;
+  font-size: 14px;
+  line-height: 1.55;
+}

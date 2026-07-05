@@ -1,0 +1,177 @@
+/* Library screen — every class carries the lb- prefix (Library module). */
+
+.lb-screen {
+  /* keep the last rows clear of the floating + button */
+  padding-bottom: 120px;
+}
+
+.lb-title {
+  margin-bottom: 14px;
+}
+
+/* ---------- search ---------- */
+.lb-search {
+  width: 100%;
+  min-height: 48px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--card);
+  padding: 0 14px;
+  font-size: 16px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.lb-search:focus {
+  outline: none;
+  border-color: var(--leaf);
+}
+
+/* ---------- segmented control ---------- */
+.lb-seg {
+  display: flex;
+  background: var(--paper-2);
+  border-radius: 999px;
+  padding: 4px;
+  margin: 12px 0 14px;
+}
+.lb-seg button {
+  flex: 1;
+  min-height: 44px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--muted);
+}
+.lb-seg button.on {
+  background: var(--card);
+  color: var(--leaf-deep);
+  box-shadow: 0 1px 3px rgba(34, 43, 32, 0.14);
+}
+
+/* ---------- list rows ---------- */
+.lb-row {
+  display: flex;
+  align-items: stretch;
+}
+.lb-star {
+  flex: none;
+  width: 48px;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: var(--faint);
+}
+.lb-star.on {
+  color: var(--amber);
+}
+.lb-row-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  padding: 9px 14px 9px 0;
+}
+.lb-row-main:active {
+  background: var(--paper-2);
+}
+.lb-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.lb-row-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-weight: 650;
+}
+.lb-row-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-row-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-est {
+  flex: none;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #f6edd8;
+  color: #7c5f1d;
+}
+.lb-row-g {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* ---------- floating add button ---------- */
+.lb-fab {
+  position: fixed;
+  z-index: 30;
+  right: max(18px, calc(50vw - 260px + 18px));
+  bottom: calc(var(--safe-bottom) + 86px);
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: var(--leaf);
+  color: #fff;
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-fab);
+}
+.lb-fab:active {
+  transform: scale(0.94);
+}
+
+/* ---------- "Add to library" action sheet ---------- */
+.lb-add-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 6px 0 10px;
+}
+.lb-add-opt {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 66px;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  text-align: left;
+}
+.lb-add-opt:active {
+  background: var(--paper-2);
+}
+.lb-add-ico {
+  flex: none;
+  font-size: 26px;
+  line-height: 1;
+}
+.lb-add-name {
+  display: block;
+  font-size: 16px;
+  font-weight: 650;
+}
+.lb-add-sub {
+  display: block;
+}

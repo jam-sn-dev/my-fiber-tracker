@@ -1,0 +1,194 @@
+/* MealBuilder flow — every class carries the lb-mb- prefix (Library module). */
+
+.lb-mb-loading {
+  min-height: 240px;
+}
+
+.lb-mb-err {
+  color: var(--danger);
+}
+
+.lb-mb-sec {
+  margin: 4px 0 8px;
+}
+
+.lb-mb-hint {
+  padding: 4px 0 10px;
+}
+
+/* ---------- ingredient rows ---------- */
+.lb-mb-list {
+  margin-bottom: 10px;
+}
+.lb-mb-ing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 8px 6px 8px 12px;
+}
+.lb-mb-ing-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.lb-mb-ing-name {
+  font-weight: 650;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-mb-step {
+  flex: none;
+  display: flex;
+  align-items: center;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  overflow: hidden;
+}
+.lb-mb-step button {
+  width: 36px;
+  min-height: 44px;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--leaf-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lb-mb-step button:disabled {
+  opacity: 0.35;
+}
+.lb-mb-qty {
+  min-width: 30px;
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+}
+.lb-mb-ing-g {
+  flex: none;
+  min-width: 46px;
+  text-align: right;
+  white-space: nowrap;
+  font-size: 15px;
+}
+.lb-mb-x {
+  flex: none;
+  width: 38px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--faint);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* ---------- inline food picker ---------- */
+.lb-mb-add {
+  margin-bottom: 6px;
+}
+.lb-mb-picker {
+  padding: 10px;
+  margin-bottom: 10px;
+}
+.lb-mb-picker-search {
+  width: 100%;
+  min-height: 44px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  padding: 0 12px;
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+.lb-mb-picker-search:focus {
+  outline: none;
+  border-color: var(--leaf);
+}
+.lb-mb-picker-list {
+  max-height: 250px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 8px;
+}
+.lb-mb-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 6px;
+  text-align: left;
+}
+.lb-mb-pick-row:active {
+  background: var(--paper-2);
+}
+.lb-mb-pick-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.lb-mb-pick-name {
+  font-weight: 650;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-mb-pick-star {
+  color: var(--amber);
+}
+.lb-mb-pick-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-mb-picker-close {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+/* ---------- total + footer ---------- */
+.lb-mb-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 12px 2px;
+  font-weight: 650;
+}
+.lb-mb-total-g {
+  font-size: 22px;
+}
+
+.lb-mb-del-row {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 8px;
+}
+.lb-mb-confirm {
+  padding: 14px;
+  margin: 12px 0 8px;
+}
+.lb-mb-confirm p {
+  margin-bottom: 12px;
+  color: var(--muted);
+}
+.lb-mb-confirm-btns {
+  display: flex;
+  gap: 10px;
+}
+.lb-mb-confirm-btns .btn {
+  flex: 1;
+}
+.lb-mb-danger {
+  background: var(--danger);
+  color: #fff;
+}

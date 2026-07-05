@@ -1,0 +1,102 @@
+/* ScanLabel flow — every class carries the lb-sc- prefix (Library module). */
+
+.lb-sc-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 16px 4px 8px;
+}
+
+.lb-sc-big {
+  font-size: 44px;
+  line-height: 1;
+}
+
+.lb-sc-lead {
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.lb-sc-gap {
+  margin-top: 6px;
+}
+
+/* ---------- pick step ---------- */
+.lb-sc-cam {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  background: var(--leaf);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 650;
+  border-radius: var(--r-lg);
+  padding: 26px 18px;
+  cursor: pointer;
+  box-shadow: var(--shadow-fab);
+}
+.lb-sc-cam:active {
+  transform: scale(0.98);
+}
+.lb-sc-cam-ico {
+  font-size: 40px;
+  line-height: 1;
+}
+.lb-sc-roll {
+  cursor: pointer;
+}
+
+/* ---------- scanning step ---------- */
+.lb-sc-scanning {
+  padding: 42px 4px;
+}
+.lb-sc-spin {
+  width: 36px;
+  height: 36px;
+  border: 4px solid var(--leaf-wash);
+  border-top-color: var(--leaf);
+  border-radius: 50%;
+  animation: lb-sc-rotate 0.9s linear infinite;
+}
+@keyframes lb-sc-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lb-sc-spin {
+    animation-duration: 2.4s;
+  }
+}
+
+/* ---------- confirm step ---------- */
+.lb-sc-strip {
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  margin-bottom: 10px;
+}
+.lb-sc-strip-leaf {
+  background: var(--leaf-wash);
+  color: var(--leaf-deep);
+}
+.lb-sc-strip-amber {
+  background: #f6edd8;
+  color: #7c5f1d;
+}
+.lb-sc-opt {
+  font-weight: 500;
+  color: var(--faint);
+}
+.lb-sc-err {
+  color: var(--danger);
+}
+.lb-sc-retake {
+  margin-top: 10px;
+}
