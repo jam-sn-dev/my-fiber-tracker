@@ -516,6 +516,14 @@ export interface VoiceContext {
   library: Array<{ name: string; fiberPerServing: number; servingLabel: string; favorite: boolean }>;
 }
 
+/** When the parser asked a clarifying question, the next utterance answers it. */
+export interface VoiceFollowUp {
+  /** What she said before (accumulated across rounds). */
+  history: string;
+  /** The clarifying question the parser asked. */
+  question: string;
+}
+
 const VOICE_SCHEMA = {
   type: 'object',
   properties: {
@@ -579,6 +587,7 @@ export async function parseVoiceCommand(
   context: VoiceContext,
   apiKey: string,
   signal?: AbortSignal,
+  followUp?: VoiceFollowUp,
 ): Promise<VoiceCommand> {
   const digest = context.library
     .slice(0, 250)
@@ -595,12 +604,20 @@ ${digest}
 
 Intents:
 - add_food: she wants a new food saved to her library and stated its fiber (e.g. "add green pepper to my foods, 1 gram of fiber per serving"). servingLabel is "1 serving" unless she said one.
-- plan: she wants foods put into a meal slot — planning ahead ("plan my breakfast with oatmeal and some berries for 5 grams") or logging what she already ate ("I had an apple for a snack" -> state "eaten"). Resolve each food to the EXACT library name when a sensible match exists ("oatmeal" -> the oats entry; "berries" -> a favorite berry). Choose qty in 0.5 steps: if she gave a gram amount for the meal, pick quantities that land at or slightly above it (her target is a floor); otherwise use 1 serving each. A food that is NOT in the library: set newFoodName, and set newFoodFiberPerServing ONLY if she spoke a number — never invent fiber values.
+- plan: she wants foods put into a meal slot — planning ahead ("plan my breakfast with oatmeal and some berries for 5 grams") or logging what she already ate ("I had an apple for a snack" -> state "eaten"). This ALSO covers requests that name no foods at all ("find me a 4 gram breakfast", "plan a high-fiber snack"): in that case YOU pick 1–3 fitting foods from her library — favorites and frequently-used first, sensible for that slot — with quantities landing at or slightly above the grams she asked for. When she names no foods, choose ONLY from the library (never invent foods she didn't mention). Resolve each named food to the EXACT library name when a sensible match exists ("oatmeal" -> the oats entry; "berries" -> a favorite berry). Choose qty in 0.5 steps: if she gave a gram amount for the meal, land at or slightly above it (her target is a floor); otherwise use 1 serving each. A named food that is NOT in the library: set newFoodName, and set newFoodFiberPerServing ONLY if she spoke a number — never invent fiber values.
 - set_target: she explicitly changes her daily target/goal.
-- unknown: anything else, or genuinely ambiguous — put a short clarifying question in "say".
+- unknown: anything else — put a short clarifying question in "say".
+
+Prefer a concrete plan over a question: if the sentence asks for a meal, a slot, or a gram amount in any phrasing ("find me…", "give me…", "what should I…", "I need a…"), return a plan — she reviews and edits it on a confirm card before anything saves. Use unknown only when you truly cannot act.
 
 Exactly one of addFood/plan/setTarget is non-null (all null for unknown). "say" is always one warm, specific sentence.
-
+${
+  followUp
+    ? `
+Conversation so far: she said "${followUp.history.replace(/"/g, "'")}" and you asked "${followUp.question.replace(/"/g, "'")}". Her sentence below ANSWERS that question — combine it with what she already said and produce the command. A plain affirmative ("yes", "sure", "do it") means: do exactly what your question proposed.
+`
+    : ''
+}
 Her sentence: "${transcript.replace(/"/g, "'")}"`;
 
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });

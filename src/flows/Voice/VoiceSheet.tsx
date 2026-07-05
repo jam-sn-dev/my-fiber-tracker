@@ -8,6 +8,7 @@ import {
   parseVoiceCommand,
   type VoiceCommand,
   type VoiceContext,
+  type VoiceFollowUp,
   type VoicePlanItem,
 } from '../../lib/ai';
 import { fmtG, gapGrams, parseGrams } from '../../lib/fiber';
@@ -153,6 +154,17 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
   const [saveError, setSaveError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [doneMsg, setDoneMsg] = useState('');
+
+  // A pending clarifying question from the parser: the next utterance (spoken
+  // or typed) is parsed as its ANSWER, not as a brand-new command. Mirrored in
+  // a ref because the mic's onend callback closes over an older render.
+  const [followUp, setFollowUpState] = useState<VoiceFollowUp | null>(null);
+  const followUpRef = useRef<VoiceFollowUp | null>(null);
+  const [answerDraft, setAnswerDraft] = useState('');
+  function setFollowUp(v: VoiceFollowUp | null) {
+    followUpRef.current = v;
+    setFollowUpState(v);
+  }
 
   // add_food confirm mini-form
   const [afName, setAfName] = useState('');
@@ -400,11 +412,12 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
     setStep('parsing');
     const ctrl = new AbortController();
     abortRef.current = ctrl;
+    const fu = followUpRef.current;
     try {
       const { context, foods } = await buildVoiceContext(date);
-      const cmd = await parseVoiceCommand(trimmed, context, apiKey, ctrl.signal);
+      const cmd = await parseVoiceCommand(trimmed, context, apiKey, ctrl.signal, fu ?? undefined);
       if (ctrl.signal.aborted) return;
-      receiveCommand(cmd, foods);
+      receiveCommand(cmd, foods, trimmed, fu);
     } catch (err) {
       if (ctrl.signal.aborted) return;
       setError(
@@ -422,12 +435,28 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
     setStep('capture');
   }
 
-  function receiveCommand(cmd: VoiceCommand, foods: Food[]) {
+  function receiveCommand(
+    cmd: VoiceCommand,
+    foods: Food[],
+    spoken: string,
+    usedFollowUp: VoiceFollowUp | null,
+  ) {
     rowProgressRef.current = new Map();
     afCreatedIdRef.current = null;
     setSaveError(null);
 
+    // A clarifying question keeps the exchange alive: the next utterance is
+    // parsed as its answer instead of resetting the whole conversation.
+    const askAgain = (question: string) => {
+      setFollowUp({
+        history: usedFollowUp ? `${usedFollowUp.history} / ${spoken}` : spoken,
+        question,
+      });
+      setAnswerDraft('');
+    };
+
     if (cmd.intent === 'add_food' && cmd.addFood) {
+      setFollowUp(null);
       setAfName(cmd.addFood.name);
       setAfServing(cmd.addFood.servingLabel.trim() || '1 serving');
       setAfFiber(String(cmd.addFood.fiberGramsPerServing));
@@ -435,8 +464,10 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
     } else if (cmd.intent === 'plan' && cmd.plan) {
       const built = buildRows(cmd.plan.items, foods);
       if (built.length === 0) {
+        askAgain(cmd.say?.trim() || 'Which foods should go in it?');
         setCommand({ ...cmd, intent: 'unknown' });
       } else {
+        setFollowUp(null);
         setRows(built);
         setCommand(cmd);
       }
@@ -446,8 +477,10 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
       Number.isFinite(cmd.setTarget.grams) &&
       cmd.setTarget.grams > 0
     ) {
+      setFollowUp(null);
       setCommand(cmd);
     } else {
+      askAgain(cmd.say?.trim() || 'Could you say that another way?');
       setCommand({ ...cmd, intent: 'unknown' });
     }
     setStep('confirm');
@@ -465,6 +498,8 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
     setCommand(null);
     setTranscript('');
     setTypedDraft('');
+    setAnswerDraft('');
+    setFollowUp(null);
     setSaveError(null);
     setNote(null);
     setStep('capture');
@@ -777,17 +812,45 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
       );
     }
 
-    // unknown — show the model's clarifying question and offer another go.
+    // unknown — the model asked a clarifying question; let her ANSWER it
+    // (by voice or text) instead of dead-ending into a reset.
+    const question =
+      followUp?.question ??
+      cmd.say?.trim() ??
+      'I didn’t quite catch that — want to say it another way?';
+    const speechAvailable =
+      (window.SpeechRecognition ?? window.webkitSpeechRecognition) != null && mode === 'speech';
     return (
       <div className="vc-center">
         <div className="vc-big" aria-hidden="true">
           🤔
         </div>
-        <p className="vc-lead">
-          {cmd.say?.trim() || 'I didn’t quite catch that — want to say it another way?'}
-        </p>
-        <button className="btn btn-primary btn-block vc-gap" onClick={backToCapture}>
-          Try again
+        <p className="vc-lead">{question}</p>
+        {speechAvailable && (
+          <button
+            className="btn btn-primary btn-block vc-gap"
+            onClick={() => void startListening()}
+          >
+            🎤 Answer
+          </button>
+        )}
+        <div className="field vc-answer">
+          <input
+            value={answerDraft}
+            onChange={(e) => setAnswerDraft(e.target.value)}
+            placeholder={speechAvailable ? 'or type your answer…' : 'Type your answer…'}
+            aria-label="Answer"
+          />
+        </div>
+        <button
+          className={speechAvailable ? 'btn btn-ghost btn-block' : 'btn btn-primary btn-block'}
+          disabled={answerDraft.trim() === ''}
+          onClick={() => void parse(answerDraft)}
+        >
+          Send answer
+        </button>
+        <button className="vc-link" onClick={startOver}>
+          start over
         </button>
       </div>
     );
@@ -828,6 +891,7 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
       ) : step === 'capture' && mode === 'speech' ? (
         <div className="vc-center">
           {noteStrip}
+          {followUp && <p className="vc-note small">Answering: “{followUp.question}”</p>}
           <button className="vc-mic" onClick={() => void startListening()} aria-label="Start listening">
             <span className="vc-mic-ico" aria-hidden="true">
               🎤
@@ -842,6 +906,7 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
       ) : step === 'capture' ? (
         <div className="vc-typed">
           {noteStrip}
+          {followUp && <p className="vc-note small">Answering: “{followUp.question}”</p>}
           <div className="field">
             <label htmlFor="vc-text">What would you like to do?</label>
             <textarea
