@@ -16,6 +16,7 @@ export type Modal =
   | { type: 'importLink'; onSaved?: (food: Food) => void }
   | { type: 'mealBuilder'; mealId?: number }
   | { type: 'dayDetail'; date: string }
+  | { type: 'voice'; date: string }
   | { type: 'settings' };
 
 export interface Nav {

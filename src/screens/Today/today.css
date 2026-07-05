@@ -31,6 +31,9 @@
   align-items: center;
   justify-content: center;
 }
+.td-mic {
+  font-size: 18px;
+}
 
 /* ---------- install nudge ---------- */
 .td-install {

@@ -15,6 +15,7 @@ import ScanListSheet from './flows/ScanList/ScanListSheet';
 import ImportLinkSheet from './flows/ImportLink/ImportLinkSheet';
 import MealBuilderSheet from './flows/MealBuilder/MealBuilderSheet';
 import DayDetailSheet from './flows/DayDetail/DayDetailSheet';
+import VoiceSheet from './flows/Voice/VoiceSheet';
 
 // Module-level singleton: StrictMode double-invokes effects in dev, and the
 // first-run seed must never race itself.
@@ -161,6 +162,8 @@ function ModalView({ modal, onClose }: { modal: Modal; onClose: () => void }) {
       return <MealBuilderSheet mealId={modal.mealId} onClose={onClose} />;
     case 'dayDetail':
       return <DayDetailSheet date={modal.date} onClose={onClose} />;
+    case 'voice':
+      return <VoiceSheet date={modal.date} onClose={onClose} />;
     case 'settings':
       return <SettingsSheet onClose={onClose} />;
   }

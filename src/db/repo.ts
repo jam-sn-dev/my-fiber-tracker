@@ -76,7 +76,11 @@ export async function addEntry(date: string, entry: Omit<Entry, 'id'>): Promise<
     await db.days.put({ ...day, entries: [...day.entries, created] });
     return created;
   });
-  await bumpUsage(entry, date);
+  // Usage bookkeeping is best-effort: the entry is already committed above,
+  // so a bumpUsage failure must not make addEntry reject — callers building
+  // retry-on-failure logic (e.g. voice confirm) treat a rejection as
+  // "nothing persisted" and would double-log the entry on retry.
+  await bumpUsage(entry, date).catch(() => {});
   return full;
 }
 
@@ -125,8 +129,9 @@ export async function copyDay(fromDate: string, toDate: string): Promise<number>
   });
   // Copying is the primary planning flow — it must feed usage learning
   // (most-used ordering, Fill-the-gap frequency bonus + variety penalty)
-  // exactly like addEntry does.
-  for (const c of copies) await bumpUsage(c, toDate);
+  // exactly like addEntry does. Best-effort for the same reason as addEntry:
+  // the entries are already committed, so a usage failure must not reject.
+  for (const c of copies) await bumpUsage(c, toDate).catch(() => {});
   return copies.length;
 }
 

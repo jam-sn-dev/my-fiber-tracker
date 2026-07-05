@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/db';
 import { copyDay, ensureDay, setDayTarget, setEntryState } from '../../db/repo';
-import { formatDayLong, todayKey, yesterdayKey } from '../../lib/dates';
+import { formatDayShort, todayKey, yesterdayKey } from '../../lib/dates';
 import { eatenTotal, fmtG, gapGrams, parseGrams, plannedTotal } from '../../lib/fiber';
 import { SLOTS, SLOT_LABELS, type Entry } from '../../types';
 import Ring from '../../components/Ring';
@@ -123,7 +123,9 @@ export default function TodayScreen() {
     <div className="screen-scroll">
       <header className="td-head">
         <div>
-          <div className="screen-kicker">{formatDayLong(date)}</div>
+          {/* Short form: the long weekday+month kicker wraps to two lines on
+              375px screens now that three actions sit beside it. */}
+          <div className="screen-kicker">{formatDayShort(date)}</div>
           <h1 className="screen-title">Today</h1>
         </div>
         <div className="td-head-actions">
@@ -133,6 +135,13 @@ export default function TodayScreen() {
             aria-expanded={editingTarget}
           >
             Target <span className="grams">{fmtG(target)}</span> g
+          </button>
+          <button
+            className="td-gear td-mic"
+            aria-label="Voice command"
+            onClick={() => openModal({ type: 'voice', date })}
+          >
+            🎤
           </button>
           <button
             className="td-gear"

@@ -10,9 +10,11 @@ permissions:
   pages: write
   id-token: write
 
+# Queue deployments rather than cancelling one mid-flight — a cancelled Pages
+# deployment surfaces as "Deployment failed, try again later" on the next run.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:

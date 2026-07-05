@@ -479,3 +479,153 @@ Also:
   if (!parsed.servingLabel) parsed.servingLabel = '1 serving';
   return parsed;
 }
+
+// ---------------------------------------------------------------------------
+// Lane: spoken (or dictated) command -> structured, confirmable action
+// ---------------------------------------------------------------------------
+
+export interface VoicePlanItem {
+  /** EXACT name of a library food when one matches, else null. */
+  libraryName: string | null;
+  /** For foods not in the library: the name she said, else null. */
+  newFoodName: string | null;
+  /** Only when she explicitly stated a fiber value for a new food; else null. */
+  newFoodFiberPerServing: number | null;
+  qty: number; // servings, 0.5 steps
+}
+
+export interface VoiceCommand {
+  intent: 'add_food' | 'plan' | 'set_target' | 'unknown';
+  /** One short, friendly sentence: what was understood, or what to ask. */
+  say: string;
+  addFood: { name: string; servingLabel: string; fiberGramsPerServing: number } | null;
+  plan: {
+    slot: 'breakfast' | 'lunch' | 'snack' | 'dinner';
+    state: 'planned' | 'eaten';
+    targetGrams: number | null;
+    items: VoicePlanItem[];
+  } | null;
+  setTarget: { grams: number } | null;
+}
+
+export interface VoiceContext {
+  date: string;
+  targetGrams: number;
+  gapGrams: number;
+  /** Compact library digest so names can be resolved on the model side. */
+  library: Array<{ name: string; fiberPerServing: number; servingLabel: string; favorite: boolean }>;
+}
+
+const VOICE_SCHEMA = {
+  type: 'object',
+  properties: {
+    intent: { type: 'string', enum: ['add_food', 'plan', 'set_target', 'unknown'] },
+    say: {
+      type: 'string',
+      description:
+        'One short friendly sentence: what you understood (e.g. "Planning breakfast: oats and raspberries, 8 g"), or for unknown, the clarifying question',
+    },
+    addFood: {
+      type: ['object', 'null'],
+      properties: {
+        name: { type: 'string' },
+        servingLabel: { type: 'string', description: '"1 serving" if she did not say one' },
+        fiberGramsPerServing: { type: 'number' },
+      },
+      required: ['name', 'servingLabel', 'fiberGramsPerServing'],
+      additionalProperties: false,
+    },
+    plan: {
+      type: ['object', 'null'],
+      properties: {
+        slot: { type: 'string', enum: ['breakfast', 'lunch', 'snack', 'dinner'] },
+        state: { type: 'string', enum: ['planned', 'eaten'] },
+        targetGrams: { type: ['number', 'null'] },
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              libraryName: { type: ['string', 'null'] },
+              newFoodName: { type: ['string', 'null'] },
+              newFoodFiberPerServing: { type: ['number', 'null'] },
+              qty: { type: 'number' },
+            },
+            required: ['libraryName', 'newFoodName', 'newFoodFiberPerServing', 'qty'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['slot', 'state', 'targetGrams', 'items'],
+      additionalProperties: false,
+    },
+    setTarget: {
+      type: ['object', 'null'],
+      properties: { grams: { type: 'number' } },
+      required: ['grams'],
+      additionalProperties: false,
+    },
+  },
+  required: ['intent', 'say', 'addFood', 'plan', 'setTarget'],
+  additionalProperties: false,
+} as const;
+
+/**
+ * Turn a spoken/dictated sentence into a structured command. The caller
+ * renders a confirm card and executes only after her approval.
+ */
+export async function parseVoiceCommand(
+  transcript: string,
+  context: VoiceContext,
+  apiKey: string,
+  signal?: AbortSignal,
+): Promise<VoiceCommand> {
+  const digest = context.library
+    .slice(0, 250)
+    .map(
+      (f) =>
+        `${f.name} | ${f.fiberPerServing} g per ${f.servingLabel}${f.favorite ? ' | favorite' : ''}`,
+    )
+    .join('\n');
+
+  const prompt = `You are the voice-command parser for Fibi, a personal fiber-planning app. Parse the user's sentence into exactly one command. Today is ${context.date}; her daily fiber target is ${context.targetGrams} g and ${context.gapGrams} g is still unplanned.
+
+Her food library (name | fiber per serving | favorite):
+${digest}
+
+Intents:
+- add_food: she wants a new food saved to her library and stated its fiber (e.g. "add green pepper to my foods, 1 gram of fiber per serving"). servingLabel is "1 serving" unless she said one.
+- plan: she wants foods put into a meal slot — planning ahead ("plan my breakfast with oatmeal and some berries for 5 grams") or logging what she already ate ("I had an apple for a snack" -> state "eaten"). Resolve each food to the EXACT library name when a sensible match exists ("oatmeal" -> the oats entry; "berries" -> a favorite berry). Choose qty in 0.5 steps: if she gave a gram amount for the meal, pick quantities that land at or slightly above it (her target is a floor); otherwise use 1 serving each. A food that is NOT in the library: set newFoodName, and set newFoodFiberPerServing ONLY if she spoke a number — never invent fiber values.
+- set_target: she explicitly changes her daily target/goal.
+- unknown: anything else, or genuinely ambiguous — put a short clarifying question in "say".
+
+Exactly one of addFood/plan/setTarget is non-null (all null for unknown). "say" is always one warm, specific sentence.
+
+Her sentence: "${transcript.replace(/"/g, "'")}"`;
+
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+  let response: Anthropic.Message;
+  try {
+    response = await client.messages.create(
+      {
+        model: MODEL,
+        max_tokens: 1500,
+        output_config: { format: { type: 'json_schema', schema: VOICE_SCHEMA } },
+        messages: [{ role: 'user', content: prompt }],
+      },
+      { signal, timeout: 60_000 },
+    );
+  } catch (err) {
+    throw mapApiError(err, 'Voice command');
+  }
+
+  if (response.stop_reason === 'refusal') {
+    throw new AiError('refused', 'That one could not be processed — try rephrasing it.');
+  }
+
+  const parsed = parseJsonLoose<VoiceCommand>(finalText(response));
+  if (!parsed.intent) {
+    throw new AiError('other', 'The result could not be read. Try again.');
+  }
+  return parsed;
+}
