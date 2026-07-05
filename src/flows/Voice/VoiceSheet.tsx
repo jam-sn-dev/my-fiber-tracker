@@ -180,6 +180,19 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
     [],
   );
 
+  // Tapping the header 🎤 should mean "talk now": once the key gate passes and
+  // we're in speech mode, start listening immediately — once per open, so a
+  // failure that lands back on capture doesn't restart itself in a loop.
+  const autoStartedRef = useRef(false);
+  useEffect(() => {
+    if (autoStartedRef.current) return;
+    if (settings === undefined || !apiKey) return;
+    if (mode !== 'speech' || step !== 'capture') return;
+    autoStartedRef.current = true;
+    void startListening();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings, apiKey, mode, step]);
+
   // ------------------------------------------------------------ live speech
 
   function clearWatchdog() {
@@ -211,20 +224,69 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
     failsRef.current = 0;
     setNote(null);
     setMode('speech');
-    startListening();
+    void startListening();
   }
 
-  function startListening() {
+  /** The shared "mic is blocked" landing: typed mode + how to fix it. */
+  function routeMicBlocked() {
+    persistVoiceMode('typed');
+    setMode('typed');
+    setNote(
+      'The mic is blocked for Fibi on this device — the keyboard mic works just as well. ' +
+        'To use the in-app mic: allow the Microphone in the app’s permissions (or the browser’s site settings), then tap “use the microphone” below.',
+    );
+    setStep('capture');
+  }
+
+  /**
+   * Android installed-PWA quirk: SpeechRecognition.start() can fail with
+   * not-allowed WITHOUT ever showing a permission prompt (Chromium bug in
+   * WebAPK context). getUserMedia DOES prompt correctly there, so when the
+   * mic permission isn't already granted we open — and immediately close —
+   * an audio stream first, purely to surface the real permission dialog.
+   */
+  async function ensureMicPermission(): Promise<'granted' | 'denied'> {
+    try {
+      const status = await navigator.permissions.query({
+        name: 'microphone' as PermissionName,
+      });
+      if (status.state === 'granted') return 'granted';
+    } catch {
+      // permissions.query unsupported here — getUserMedia below decides
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((t) => t.stop());
+      return 'granted';
+    } catch {
+      return 'denied';
+    }
+  }
+
+  async function startListening() {
     const Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
     if (!Ctor) {
       setMode('typed');
       return;
     }
+    if (recRef.current) return; // a session is already live
+
     suppressRef.current = false;
+    setNote(null);
+    setHeard('');
+    heardRef.current = '';
+    setStep('listening'); // shows "Listening…" while the permission settles
+
+    const perm = await ensureMicPermission();
+    if (suppressRef.current) return; // sheet closed while the prompt was up
+    if (perm === 'denied') {
+      routeMicBlocked();
+      return;
+    }
+
     errorRoutedRef.current = false;
     heardRef.current = '';
     setHeard('');
-    setNote(null);
 
     const rec = new Ctor();
     rec.lang = navigator.language;
@@ -268,15 +330,7 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
       recRef.current = null;
       if (suppressRef.current) return;
       if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
-        // Mic permission is blocked — settle into typing, but say how to get
-        // the mic back and leave the door open via "use the microphone".
-        persistVoiceMode('typed');
-        setMode('typed');
-        setNote(
-          'The mic is blocked for Fibi on this device — the keyboard mic works just as well. ' +
-            'To use the in-app mic: allow the Microphone in the app’s permissions (or the browser’s site settings), then tap “use the microphone” below.',
-        );
-        setStep('capture');
+        routeMicBlocked();
         return;
       }
       softFail(
@@ -774,7 +828,7 @@ export default function VoiceSheet({ date, onClose }: { date: string; onClose: (
       ) : step === 'capture' && mode === 'speech' ? (
         <div className="vc-center">
           {noteStrip}
-          <button className="vc-mic" onClick={startListening} aria-label="Start listening">
+          <button className="vc-mic" onClick={() => void startListening()} aria-label="Start listening">
             <span className="vc-mic-ico" aria-hidden="true">
               🎤
             </span>
