@@ -19,12 +19,16 @@ interface BackupFile {
  * share/save flow — that's expected.
  */
 export async function exportBackup(): Promise<void> {
-  const [foods, meals, days, settings] = await Promise.all([
+  const [foods, meals, days, settingsRows] = await Promise.all([
     db.foods.toArray(),
     db.meals.toArray(),
     db.days.toArray(),
     db.settings.toArray(),
   ]);
+
+  // Never write the API key into a backup: the file may be shared or synced
+  // to cloud storage. The key stays on the device that entered it.
+  const settings = settingsRows.map(({ apiKey: _apiKey, ...rest }) => rest as Settings);
 
   const backup: BackupFile = {
     version: 1,
@@ -95,6 +99,10 @@ export async function importBackup(
     throw new Error("That file doesn't look like a Fibi backup — some of its data is malformed.");
   }
 
+  // Backups don't carry the API key (see exportBackup) — hold on to this
+  // device's key so a restore never silently disables scanning and voice.
+  const localKey = (await db.settings.get('app'))?.apiKey;
+
   await db.transaction('rw', [db.foods, db.meals, db.days, db.settings], async () => {
     await Promise.all([
       db.foods.clear(),
@@ -106,6 +114,10 @@ export async function importBackup(
     await db.meals.bulkPut(meals);
     await db.days.bulkPut(days);
     await db.settings.bulkPut(settings);
+    if (localKey) {
+      const imported = await db.settings.get('app');
+      if (imported) await db.settings.put({ ...imported, apiKey: localKey });
+    }
   });
 
   // The backup may predate today (or come from another device), so today's
