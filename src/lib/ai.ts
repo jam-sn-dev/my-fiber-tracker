@@ -413,8 +413,12 @@ export async function extractMealFromUrl(
 
   const prompt = `Fetch this recipe page and extract its dietary fiber information: ${cleaned.href}
 
-Rules:
-- fiberGramsPerServing must come from the page's printed nutrition information (the "Dietary Fiber" value, per serving). If the page shows no fiber value anywhere, return null for it — NEVER estimate or infer one.
+Rules for fiberGramsPerServing (per serving, from the page's printed nutrition information only):
+1. If the page lists "Dietary Fiber" (or "Fiber") directly, use that value with confidence "high".
+2. Otherwise, if the page lists BOTH total "Carbohydrates" AND "Net Carbs" (Home Chef pages do this), derive fiber = carbohydrates minus net carbs. Set confidence to "medium" and state the arithmetic in notes, e.g. "Derived: 56 g carbs − 53 g net carbs = 3 g fiber — the recipe card in the box can confirm."
+3. If neither is available, return null. NEVER guess fiber from the ingredients or the dish type.
+
+Also:
 - mealName: the recipe title. brand: the service name (e.g. "Home Chef").
 - servingLabel: "1 serving" unless the page clearly defines something else.`;
 
