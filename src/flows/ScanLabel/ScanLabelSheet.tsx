@@ -1,15 +1,20 @@
-import { useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Sheet from '../../components/Sheet';
 import { db } from '../../db/db';
 import { addFood } from '../../db/repo';
-import { AiError, extractNutritionLabel } from '../../lib/ai';
+import { AiError, extractMealFromUrl, extractNutritionLabel } from '../../lib/ai';
 import { parseGrams } from '../../lib/fiber';
 import { useNav } from '../../nav';
 import { DEFAULT_SETTINGS, type Food } from '../../types';
 import './scan-label.css';
 
-type Step = 'pick' | 'scanning' | 'confirm' | 'error';
+type Step = 'pick' | 'scanning' | 'chasing' | 'confirm' | 'error';
+
+/** Printed URLs usually omit the scheme ("www.homechef.com/53562"). */
+function withScheme(raw: string): string {
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
+}
 
 export default function ScanLabelSheet({
   onSaved,
@@ -34,6 +39,13 @@ export default function ScanLabelSheet({
   const [fiber, setFiber] = useState('');
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
+  // Recipe-card chase: the photo carried a nutrition URL instead of a panel.
+  const [chaseHost, setChaseHost] = useState('');
+  const [chased, setChased] = useState(false);
+  const [fiberEdited, setFiberEdited] = useState(false);
+  const chaseAbort = useRef<AbortController | null>(null);
+
+  useEffect(() => () => chaseAbort.current?.abort(), []);
 
   const fiberNum = parseGrams(fiber);
   const nameOk = name.trim().length > 0;
@@ -49,8 +61,18 @@ export default function ScanLabelSheet({
     input.value = ''; // let her pick the same photo again after a retake
     if (!file || !apiKey) return;
     setStep('scanning');
+    setChased(false);
+    setFiberEdited(false);
     try {
       const ex = await extractNutritionLabel(file, apiKey);
+
+      // Meal-kit card: no fiber on the photo, but a printed nutrition URL —
+      // follow it (Home Chef cards say "View nutritional information at …").
+      if (ex.nutritionUrl && ex.fiberGramsPerServing <= 0) {
+        await chaseNutritionUrl(ex);
+        return;
+      }
+
       // Join productName + brand sensibly: name gets the product name,
       // falling back to the brand alone if that's all the label showed.
       setName(ex.productName ?? ex.brand ?? '');
@@ -74,6 +96,71 @@ export default function ScanLabelSheet({
     }
   }
 
+  /** The photo pointed at a nutrition page — fetch it and prefill the card. */
+  async function chaseNutritionUrl(ex: {
+    productName: string | null;
+    brand: string | null;
+    nutritionUrl: string | null;
+  }) {
+    const url = withScheme(ex.nutritionUrl!);
+    let host = '';
+    try {
+      host = new URL(url).hostname.replace(/^www\./, '');
+    } catch {
+      host = 'the linked page';
+    }
+    const cardName = ex.productName ?? '';
+    const cardBrand = ex.brand ?? (host.includes('homechef') ? 'Home Chef' : '');
+    setChaseHost(host);
+    setChased(true);
+    setStep('chasing');
+
+    const ctrl = new AbortController();
+    chaseAbort.current = ctrl;
+    try {
+      const r = await extractMealFromUrl(url, apiKey, ctrl.signal);
+      if (ctrl.signal.aborted) return;
+      setName(r.mealName ?? cardName);
+      setBrand(r.brand ?? cardBrand);
+      setServing(r.servingLabel || '1 serving');
+      if (r.fiberGramsPerServing != null) {
+        setFiber(String(r.fiberGramsPerServing));
+        setWarn(
+          r.confidence !== 'high' || r.notes
+            ? (r.notes ?? 'Give the number a quick look before saving.')
+            : null,
+        );
+      } else {
+        setFiber('');
+        setWarn(`${host} didn’t show a fiber value for this meal — type it in below.`);
+      }
+      setTouched({});
+      setStep('confirm');
+    } catch (err) {
+      if (ctrl.signal.aborted) return;
+      // Don't dead-end: she's holding the card — open the confirm form with
+      // what the photo gave us and let her fill the fiber in herself.
+      setName(cardName);
+      setBrand(cardBrand);
+      setServing('1 serving');
+      setFiber('');
+      setWarn(
+        `The card links to ${host}, but the page couldn’t be read just now${
+          err instanceof AiError ? ` (${err.message.replace(/\.$/, '').toLowerCase()})` : ''
+        }. Type the fiber in below, or retake to try again.`,
+      );
+      setTouched({});
+      setStep('confirm');
+    } finally {
+      if (chaseAbort.current === ctrl) chaseAbort.current = null;
+    }
+  }
+
+  function cancelChase() {
+    chaseAbort.current?.abort();
+    setStep('pick');
+  }
+
   async function save() {
     if (!valid || busy) return;
     setBusy(true);
@@ -83,7 +170,10 @@ export default function ScanLabelSheet({
         brand: brand.trim() || undefined,
         servingLabel: serving.trim(),
         fiberPerServing: fiberNum,
-        source: 'label' as const,
+        // A value read straight off a printed panel is label-grade; one that
+        // was derived from a linked nutrition page stays an estimate unless
+        // she typed her own number.
+        source: chased ? (fiberEdited ? ('manual' as const) : ('estimate' as const)) : ('label' as const),
         favorite: false,
       };
       const id = await addFood(fields);
@@ -128,7 +218,19 @@ export default function ScanLabelSheet({
             <input type="file" accept="image/*" hidden onChange={handleFile} />
             Choose from photos
           </label>
-          <p className="small muted">Works on screenshots too.</p>
+          <p className="small muted">
+            Works on screenshots too — and on meal-kit recipe cards: if the card prints a
+            nutrition link (Home Chef does), Fibi follows it for you.
+          </p>
+        </div>
+      ) : step === 'chasing' ? (
+        <div className="lb-sc-center lb-sc-scanning" role="status">
+          <div className="lb-sc-spin" aria-hidden="true" />
+          <p className="lb-sc-lead">The card links to {chaseHost} — reading the nutrition page…</p>
+          <p className="small muted">Usually 15–30 seconds.</p>
+          <button className="btn btn-ghost btn-block lb-sc-gap" onClick={cancelChase}>
+            Cancel
+          </button>
         </div>
       ) : step === 'scanning' ? (
         <div className="lb-sc-center lb-sc-scanning" role="status">
@@ -160,7 +262,9 @@ export default function ScanLabelSheet({
       ) : (
         <>
           <div className="lb-sc-strip lb-sc-strip-leaf">
-            Read from your photo — check the numbers before saving.
+            {chased
+              ? `Read from the card’s nutrition page (${chaseHost}) — check the numbers before saving.`
+              : 'Read from your photo — check the numbers before saving.'}
           </div>
           {warn && <div className="lb-sc-strip lb-sc-strip-amber">{warn}</div>}
 
@@ -208,7 +312,10 @@ export default function ScanLabelSheet({
               step="0.1"
               min="0"
               value={fiber}
-              onChange={(e) => setFiber(e.target.value)}
+              onChange={(e) => {
+                setFiber(e.target.value);
+                setFiberEdited(true);
+              }}
               onBlur={() => touch('fiber')}
             />
             {touched.fiber && !fiberOk && (

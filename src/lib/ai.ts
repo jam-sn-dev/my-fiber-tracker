@@ -8,6 +8,13 @@ export interface LabelExtraction {
   fiberGramsPerServing: number;
   confidence: 'high' | 'medium' | 'low';
   notes: string | null; // anything the user should double-check
+  /**
+   * Meal-kit recipe cards (Home Chef etc.) often print a nutrition URL
+   * instead of a Nutrition Facts panel — e.g. "View nutritional information
+   * at www.homechef.com/53562". When the photo shows one, it lands here so
+   * the caller can follow it with extractMealFromUrl.
+   */
+  nutritionUrl: string | null;
 }
 
 export class AiError extends Error {
@@ -42,18 +49,32 @@ const LABEL_SCHEMA = {
       description:
         'Only if something needs double-checking (blurry value, per-container vs per-serving ambiguity), else null',
     },
+    nutritionUrl: {
+      type: ['string', 'null'],
+      description:
+        'A nutrition-information URL printed on the photo (e.g. "www.homechef.com/53562"), exactly as printed; null if none',
+    },
   },
-  required: ['productName', 'brand', 'servingLabel', 'fiberGramsPerServing', 'confidence', 'notes'],
+  required: [
+    'productName',
+    'brand',
+    'servingLabel',
+    'fiberGramsPerServing',
+    'confidence',
+    'notes',
+    'nutritionUrl',
+  ],
   additionalProperties: false,
 } as const;
 
-const PROMPT = `Read this photo of a food package's Nutrition Facts panel and extract the dietary fiber information.
+const PROMPT = `Read this photo of a food package's Nutrition Facts panel (or a meal-kit recipe card) and extract the dietary fiber information.
 
 Rules:
 - fiberGramsPerServing is the DIETARY FIBER line (not total carbohydrate, not sugar), per serving.
 - If the label shows both per-serving and per-container columns, use the per-serving column and mention this in notes.
 - servingLabel is the serving size exactly as printed.
-- If you cannot clearly read the dietary fiber value, set confidence to "low" and explain in notes.`;
+- If you cannot clearly read the dietary fiber value, set confidence to "low" and explain in notes.
+- Meal-kit recipe cards (Home Chef and similar) often have NO Nutrition Facts panel and instead print a link like "View nutritional information at www.homechef.com/53562". If the photo shows such a URL, put it in nutritionUrl exactly as printed. If the card also shows no readable fiber value, set fiberGramsPerServing to 0 and confidence to "low" — the app will follow the link. Set productName to the dish name if it appears anywhere on the card, and brand to the meal-kit service name if identifiable.`;
 
 interface DecodedPhoto {
   source: CanvasImageSource;
@@ -183,9 +204,15 @@ export async function extractNutritionLabel(
     throw new AiError('other', 'The result could not be read. Try again.');
   }
 
-  if (typeof parsed.fiberGramsPerServing !== 'number' || parsed.fiberGramsPerServing < 0) {
+  parsed.nutritionUrl = parsed.nutritionUrl?.trim() || null;
+  const fiberOk =
+    typeof parsed.fiberGramsPerServing === 'number' && parsed.fiberGramsPerServing >= 0;
+  // A meal-kit card with just a nutrition link is a valid result — the caller
+  // follows the URL. Only fail when there's neither a fiber value nor a link.
+  if (!fiberOk && !parsed.nutritionUrl) {
     throw new AiError('other', 'No dietary fiber value was found on the label.');
   }
+  if (!fiberOk) parsed.fiberGramsPerServing = 0;
   return parsed;
 }
 
